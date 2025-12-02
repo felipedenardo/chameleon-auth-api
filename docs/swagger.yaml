@@ -1,0 +1,201 @@
+basePath: /api/v1
+definitions:
+  internal_api_handler_auth.ChangePasswordRequest:
+    properties:
+      confirm_password:
+        type: string
+      current_password:
+        type: string
+      new_password:
+        minLength: 8
+        type: string
+    required:
+    - confirm_password
+    - current_password
+    - new_password
+    type: object
+  internal_api_handler_auth.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  internal_api_handler_auth.LoginResponse:
+    properties:
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/internal_api_handler_auth.UserResponse'
+    type: object
+  internal_api_handler_auth.RegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        maxLength: 100
+        minLength: 3
+        type: string
+      password:
+        minLength: 6
+        type: string
+      role:
+        enum:
+        - admin
+        - professional
+        type: string
+    required:
+    - email
+    - name
+    - password
+    - role
+    type: object
+  internal_api_handler_auth.UserResponse:
+    properties:
+      created_at:
+        type: string
+      deleted_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      role:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  response.FieldError:
+    properties:
+      error:
+        type: string
+      field:
+        type: string
+    type: object
+  response.Standard:
+    properties:
+      data: {}
+      errors:
+        items:
+          $ref: '#/definitions/response.FieldError'
+        type: array
+      message:
+        type: string
+      meta: {}
+      status:
+        type: string
+    type: object
+host: localhost:8081
+info:
+  contact: {}
+  description: Este serviço é o Provedor Central de Identidade (IAM)...
+  title: Auth API Microservice (Chameleon System)
+  version: "1.0"
+paths:
+  /auth/change-password:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Dados para alteração de senha
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handler_auth.ChangePasswordRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Standard'
+      security:
+      - ApiKeyAuth: []
+      summary: Altera a senha do usuário logado
+      tags:
+      - Auth
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Credenciais do usuário para login
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handler_auth.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Standard'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_api_handler_auth.LoginResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Standard'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Standard'
+      summary: Autenticar usuário
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Dados para registro de novo usuário
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/internal_api_handler_auth.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Standard'
+            - properties:
+                data:
+                  $ref: '#/definitions/internal_api_handler_auth.UserResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Standard'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Standard'
+      summary: Registra um novo usuário
+      tags:
+      - Auth
+schemes:
+- http
+securityDefinitions:
+  ApiKeyAuth:
+    description: Digite o token no formato Bearer {token}
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

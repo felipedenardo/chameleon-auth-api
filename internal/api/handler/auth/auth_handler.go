@@ -21,7 +21,8 @@ func NewAuthHandler(s auth.IService) *Handler {
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Success 201 {object} response.Standard
+// @Param request body RegisterRequest true "Dados para registro de novo usuário"
+// @Success 201 {object} response.Standard{data=UserResponse}
 // @Failure 400 {object} response.Standard
 // @Failure 500 {object} response.Standard
 // @Router /auth/register [post]
@@ -52,7 +53,8 @@ func (h *Handler) Register(c *gin.Context) {
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Success 200 {object} response.Standard
+// @Param request body LoginRequest true "Credenciais do usuário para login"
+// @Success 200 {object} response.Standard{data=LoginResponse}
 // @Failure 401 {object} response.Standard
 // @Failure 500 {object} response.Standard
 // @Router /auth/login [post]
@@ -83,6 +85,8 @@ func (h *Handler) Login(c *gin.Context) {
 // @Security ApiKeyAuth
 // @Accept json
 // @Produce json
+// @Param request body ChangePasswordRequest true "Dados para alteração de senha"
+// @Success 200 {object} response.Standard
 // @Router /auth/change-password [post]
 func (h *Handler) ChangePassword(c *gin.Context) {
 	var req ChangePasswordRequest

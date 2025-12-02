@@ -12,6 +12,16 @@ import (
 	"log"
 )
 
+// @title Auth API Microservice (Chameleon System)
+// @version 1.0
+// @description Este serviço é o Provedor Central de Identidade (IAM)...
+// @host localhost:8081
+// @BasePath /api/v1
+// @schemes http
+// @securityDefinitions.apikey ApiKeyAuth
+// @in header
+// @name Authorization
+// @description Digite o token no formato Bearer {token}
 func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("[INFO] No .env file found, using system environment variables.")

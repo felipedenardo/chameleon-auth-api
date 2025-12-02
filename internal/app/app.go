@@ -1,6 +1,7 @@
 package app
 
 import (
+	_ "github.com/felipedenardo/chameleon-auth-api/docs"
 	authhandler "github.com/felipedenardo/chameleon-auth-api/internal/api/handler/auth"
 	"github.com/felipedenardo/chameleon-auth-api/internal/config"
 	authdomain "github.com/felipedenardo/chameleon-auth-api/internal/domain/auth"
@@ -33,7 +34,7 @@ func SetupRouter(handlers *HandlerContainer, cfg *config.Config) *gin.Engine {
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	api := r.Group("/api/auth/v1")
+	api := r.Group("/api/v1")
 	{
 		authRoutes := api.Group("/auth")
 		{
