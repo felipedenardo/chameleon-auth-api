@@ -5,8 +5,10 @@ import (
 	"github.com/felipedenardo/chameleon-auth-api/internal/config"
 	authdomain "github.com/felipedenardo/chameleon-auth-api/internal/domain/auth"
 	"github.com/felipedenardo/chameleon-auth-api/internal/infra/database/postgresql/repository"
-
+	"github.com/felipedenardo/chameleon-common/pkg/middleware"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"gorm.io/gorm"
 )
 
@@ -26,8 +28,10 @@ func NewHandlerContainer(db *gorm.DB, cfg *config.Config) *HandlerContainer {
 	}
 }
 
-func SetupRouter(handlers *HandlerContainer) *gin.Engine {
+func SetupRouter(handlers *HandlerContainer, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
+
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	api := r.Group("/api/auth/v1")
 	{
@@ -35,6 +39,12 @@ func SetupRouter(handlers *HandlerContainer) *gin.Engine {
 		{
 			authRoutes.POST("/register", handlers.AuthHandler.Register)
 			authRoutes.POST("/login", handlers.AuthHandler.Login)
+		}
+
+		authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret)
+		protectedAuthRoutes := api.Group("/auth").Use(authMiddleware)
+		{
+			protectedAuthRoutes.POST("/change-password", handlers.AuthHandler.ChangePassword)
 		}
 
 		api.GET("/health", func(c *gin.Context) {

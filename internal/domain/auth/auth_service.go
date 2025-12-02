@@ -14,6 +14,7 @@ import (
 type IService interface {
 	Register(ctx context.Context, name, email, password, role string) (*user.User, error)
 	Login(ctx context.Context, email, password string) (string, *user.User, error)
+	ChangePassword(ctx context.Context, id uuid.UUID, password string, password2 string) error
 }
 
 type authService struct {
@@ -87,4 +88,30 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 	}
 
 	return tokenString, foundUser, nil
+}
+
+func (s *authService) ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword string, newPassword string) error {
+	foundUser, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	if foundUser == nil {
+		return errors.New("user not found")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.PasswordHash), []byte(currentPassword)); err != nil {
+		return errors.New("invalid current password")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.PasswordHash), []byte(newPassword)); err == nil {
+		return errors.New("new password cannot be the same as the current password")
+	}
+
+	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	return s.repo.UpdatePasswordHash(ctx, userID, string(newHash))
 }

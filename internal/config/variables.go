@@ -10,9 +10,8 @@ type Config struct {
 	DBUser     string
 	DBPassword string
 	DBName     string
-
-	JWTSecret string
-	Port      string
+	JWTSecret  string
+	Port       string
 }
 
 func Load() *Config {

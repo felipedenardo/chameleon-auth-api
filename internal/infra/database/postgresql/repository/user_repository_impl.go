@@ -6,6 +6,7 @@ import (
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
+	"time"
 )
 
 type userRepository struct {
@@ -37,4 +38,21 @@ func (r *userRepository) FindByID(ctx context.Context, id uuid.UUID) (*user.User
 		return nil, err
 	}
 	return &u, nil
+}
+
+func (r *userRepository) UpdatePasswordHash(ctx context.Context, userID uuid.UUID, newHash string) error {
+	updates := map[string]interface{}{
+		"password_hash": newHash,
+		"updated_at":    time.Now(),
+	}
+
+	result := r.db.WithContext(ctx).Model(&user.User{}).Where("id = ?", userID).Updates(updates)
+	if result.Error != nil {
+		return result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return errors.New("user not found or no changes applied")
+	}
+	return nil
 }

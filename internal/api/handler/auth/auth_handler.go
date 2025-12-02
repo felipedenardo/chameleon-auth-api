@@ -1,11 +1,11 @@
 package auth
 
 import (
+	"errors"
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/auth"
 	httphelpers "github.com/felipedenardo/chameleon-common/pkg/http"
-	"github.com/felipedenardo/chameleon-common/pkg/response"
 	"github.com/gin-gonic/gin"
-	"net/http"
+	"github.com/google/uuid"
 )
 
 type Handler struct {
@@ -35,12 +35,16 @@ func (h *Handler) Register(c *gin.Context) {
 
 	userDomain, err := h.service.Register(c.Request.Context(), req.Name, req.Email, req.Password, req.Role)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, response.NewInternalErr())
+		if errors.Is(err, errors.New("email already exists")) {
+			httphelpers.RespondDomainFail(c, err.Error())
+			return
+		}
+		httphelpers.RespondInternalError(c, err)
 		return
 	}
 
 	responseDTO := ToUserResponse(userDomain)
-	c.JSON(http.StatusCreated, response.NewCreated(responseDTO))
+	httphelpers.RespondCreated(c, responseDTO)
 }
 
 // Login godoc
@@ -61,7 +65,7 @@ func (h *Handler) Login(c *gin.Context) {
 
 	token, userDomain, err := h.service.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, response.NewErrorCustom(err.Error()))
+		httphelpers.RespondUnauthorized(c, err.Error())
 		return
 	}
 
@@ -69,5 +73,53 @@ func (h *Handler) Login(c *gin.Context) {
 		Token: token,
 		User:  ToUserResponse(userDomain),
 	}
-	c.JSON(http.StatusOK, response.NewSuccess(responseDTO))
+
+	httphelpers.RespondOK(c, responseDTO)
+}
+
+// ChangePassword godoc
+// @Summary Altera a senha do usuário logado
+// @Tags Auth
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Router /auth/change-password [post]
+func (h *Handler) ChangePassword(c *gin.Context) {
+	var req ChangePasswordRequest
+
+	userIDString, exists := c.Get("userID")
+	if !exists {
+		httphelpers.RespondUnauthorized(c, "Authentication context missing")
+		return
+	}
+
+	userID, err := uuid.Parse(userIDString.(string))
+	if err != nil {
+		httphelpers.RespondParamError(c, "user_id", "Invalid user id in token")
+		return
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httphelpers.RespondBindingError(c, err)
+		return
+	}
+
+	err = h.service.ChangePassword(
+		c.Request.Context(),
+		userID,
+		req.CurrentPassword,
+		req.NewPassword,
+	)
+
+	if err != nil {
+		if errors.Is(err, errors.New("invalid current password")) ||
+			errors.Is(err, errors.New("new password cannot be the same as the current password")) {
+			httphelpers.RespondDomainFail(c, err.Error())
+			return
+		}
+		httphelpers.RespondInternalError(c, err)
+		return
+	}
+
+	httphelpers.RespondOK(c, gin.H{"message": "Password changed successfully"})
 }

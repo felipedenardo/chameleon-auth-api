@@ -43,7 +43,7 @@ func main() {
 
 	handlers := app.NewHandlerContainer(db, cfg)
 
-	r := app.SetupRouter(handlers)
+	r := app.SetupRouter(handlers, cfg)
 
 	log.Printf("[INFO] Auth API running on port %s", cfg.Port)
 	if err := r.Run(":" + cfg.Port); err != nil {
