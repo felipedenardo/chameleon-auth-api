@@ -1,4 +1,4 @@
-module auth-api
+module github.com/felipedenardo/chameleon-auth-api
 
 go 1.24.3
 

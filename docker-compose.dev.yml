@@ -3,7 +3,6 @@ version: '3.8'
 services:
   auth_db:
     image: postgres:15-alpine
-    container_name: auth_postgres
     environment:
       POSTGRES_USER: auth
       POSTGRES_PASSWORD: auth
@@ -13,7 +12,9 @@ services:
     volumes:
       - auth_postgres_data:/var/lib/postgresql/data
     networks:
-      - microservices-net
+      microservices-net:
+        aliases:
+          - auth
 
 volumes:
   auth_postgres_data:

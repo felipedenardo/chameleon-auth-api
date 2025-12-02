@@ -1,10 +1,10 @@
 package app
 
 import (
-	authhandler "auth-api/internal/api/handler/auth"
-	"auth-api/internal/config"
-	authdomain "auth-api/internal/domain/auth"
-	"auth-api/internal/infra/database/postgresql/repository"
+	authhandler "github.com/felipedenardo/chameleon-auth-api/internal/api/handler/auth"
+	"github.com/felipedenardo/chameleon-auth-api/internal/config"
+	authdomain "github.com/felipedenardo/chameleon-auth-api/internal/domain/auth"
+	"github.com/felipedenardo/chameleon-auth-api/internal/infra/database/postgresql/repository"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"

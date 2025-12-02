@@ -9,7 +9,9 @@ RUN go mod download
 
 COPY . .
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o auth-api ./cmd/api/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -o chameleon-auth-api ./cmd/api/main.go
+
+# -----------------------------------------------------------
 
 FROM alpine:latest
 
@@ -17,10 +19,10 @@ RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
-COPY --from=builder /app/auth-api .
+COPY --from=builder /app/chameleon-auth-api .
 
 COPY .env .
 
 EXPOSE 8081
 
-CMD ["./auth-api"]
+CMD ["./chameleon-auth-api"]

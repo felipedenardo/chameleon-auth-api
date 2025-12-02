@@ -3,7 +3,6 @@ version: '3.8'
 services:
   auth_api:
     build: .
-    container_name: auth_api
     ports:
       - "8081:8081"
     depends_on:
@@ -20,7 +19,6 @@ services:
 
   auth_db:
     image: postgres:15-alpine
-    container_name: auth_postgres
     environment:
       POSTGRES_USER: auth
       POSTGRES_PASSWORD: auth
@@ -30,7 +28,9 @@ services:
     volumes:
       - auth_postgres_data:/var/lib/postgresql/data
     networks:
-      - microservices-net
+      microservices-net:
+        aliases:
+          - auth # Permite que o DB seja acessado pelo host "auth" dentro da rede Docker
 
 volumes:
   auth_postgres_data:

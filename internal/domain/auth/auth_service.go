@@ -1,9 +1,9 @@
 package auth
 
 import (
-	"auth-api/internal/domain/user"
 	"context"
 	"errors"
+	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	"github.com/felipedenardo/chameleon-common/pkg/base"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"

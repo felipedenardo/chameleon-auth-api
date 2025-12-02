@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"auth-api/internal/domain/user"
+	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	"github.com/felipedenardo/chameleon-common/pkg/base"
 )
 

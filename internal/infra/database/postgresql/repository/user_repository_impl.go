@@ -1,9 +1,9 @@
 package repository
 
 import (
-	"auth-api/internal/domain/user"
 	"context"
 	"errors"
+	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
 )

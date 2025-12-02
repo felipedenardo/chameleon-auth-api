@@ -1,10 +1,10 @@
 package main
 
 import (
-	"auth-api/internal/app"
-	"auth-api/internal/config"
-	"auth-api/internal/infra/database/postgresql/migration"
 	"fmt"
+	"github.com/felipedenardo/chameleon-auth-api/internal/app"
+	"github.com/felipedenardo/chameleon-auth-api/internal/config"
+	"github.com/felipedenardo/chameleon-auth-api/internal/infra/database/postgresql/migration"
 	"github.com/go-gormigrate/gormigrate/v2"
 	"github.com/joho/godotenv"
 	"gorm.io/driver/postgres"
