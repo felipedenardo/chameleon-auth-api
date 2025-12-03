@@ -47,6 +47,8 @@ func SetupRouter(handlers *HandlerContainer, cfg *config.Config) *gin.Engine {
 		{
 			authRoutes.POST("/register", handlers.AuthHandler.Register)
 			authRoutes.POST("/login", handlers.AuthHandler.Login)
+			authRoutes.POST("/forgot-password", handlers.AuthHandler.ForgotPassword)
+			authRoutes.POST("/reset-password", handlers.AuthHandler.ResetPassword)
 		}
 
 		authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret, cacheRepoForMiddleware)

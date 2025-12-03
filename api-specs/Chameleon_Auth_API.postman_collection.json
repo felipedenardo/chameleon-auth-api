@@ -159,6 +159,64 @@
         }
       },
       "response": []
+    },
+    {
+      "name": "6. Forgot Password (Inicia Reset)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"email\": \"teste.user@chameleon.com\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/forgot-password",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "forgot-password"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "7. Reset Password (Finaliza Reset)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n    \"token\": \"INSIRA_AQUI_O_UUID_GERADO_NO_LOG\",\n    \"new_password\": \"NovaSenha!456\",\n    \"confirm_password\": \"NovaSenha!456\"\n}"
+        },
+        "url": {
+          "raw": "{{base_url}}/api/v1/auth/reset-password",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "v1",
+            "auth",
+            "reset-password"
+          ]
+        }
+      },
+      "response": []
     }
   ],
   "variable": [

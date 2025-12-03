@@ -10,4 +10,6 @@ type IService interface {
 	Login(ctx context.Context, email, password string) (string, *User, error)
 	ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword string, newPassword string) error
 	Logout(ctx context.Context, token string) error
+	ForgotPassword(ctx context.Context, email string) error
+	ResetPassword(ctx context.Context, resetToken string, newPassword string) error
 }

@@ -2,18 +2,19 @@ package auth
 
 import (
 	"errors"
-	"github.com/felipedenardo/chameleon-auth-api/internal/domain/auth"
+	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	httphelpers "github.com/felipedenardo/chameleon-common/pkg/http"
 	"github.com/felipedenardo/chameleon-common/pkg/middleware"
+	"github.com/felipedenardo/chameleon-common/pkg/validation"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )
 
 type Handler struct {
-	service auth.IService
+	service user.IService
 }
 
-func NewAuthHandler(s auth.IService) *Handler {
+func NewAuthHandler(s user.IService) *Handler {
 	return &Handler{service: s}
 }
 
@@ -155,4 +156,71 @@ func (h *Handler) Logout(c *gin.Context) {
 	}
 
 	httphelpers.RespondOK(c, gin.H{"message": "Sessão encerrada com sucesso."})
+}
+
+// ForgotPassword godoc
+// @Summary Iniciar recuperação de senha
+// @Description Recebe o e-mail do usuário e envia um token de reset
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body ForgotPasswordRequest true "E-mail do usuário"
+// @Success 200 {object} response.Standard
+// @Failure 400 {object} response.Standard
+// @Failure 500 {object} response.Standard
+// @Router /auth/forgot-password [post]
+func (h *Handler) ForgotPassword(c *gin.Context) {
+	var req ForgotPasswordRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httphelpers.RespondBindingError(c, err)
+		return
+	}
+
+	if errs := validation.ValidateRequest(req); errs != nil {
+		httphelpers.RespondValidation(c, errs)
+		return
+	}
+
+	err := h.service.ForgotPassword(c.Request.Context(), req.Email)
+
+	if err != nil {
+		httphelpers.RespondInternalError(c, err)
+		return
+	}
+
+	httphelpers.RespondOK(c, gin.H{"message": "Se o usuário existir, um link de reset foi enviado."})
+}
+
+// ResetPassword godoc
+// @Summary Finalizar reset de senha
+// @Description Recebe o token de reset e a nova senha para atualizar no DB.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body ResetPasswordRequest true "Token de reset e nova senha"
+// @Success 200 {object} response.Standard
+// @Failure 400 {object} response.Standard
+// @Failure 500 {object} response.Standard
+// @Router /auth/reset-password [post]
+func (h *Handler) ResetPassword(c *gin.Context) {
+	var req ResetPasswordRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httphelpers.RespondBindingError(c, err)
+		return
+	}
+	if errs := validation.ValidateRequest(req); errs != nil {
+		httphelpers.RespondValidation(c, errs)
+		return
+	}
+
+	err := h.service.ResetPassword(c.Request.Context(), req.Token, req.NewPassword)
+
+	if err != nil {
+		httphelpers.RespondDomainFail(c, err.Error())
+		return
+	}
+
+	httphelpers.RespondOK(c, gin.H{"message": "Senha alterada com sucesso."})
 }

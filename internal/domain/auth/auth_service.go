@@ -12,20 +12,13 @@ import (
 	"time"
 )
 
-type IService interface {
-	Register(ctx context.Context, name, email, password, role string) (*user.User, error)
-	Login(ctx context.Context, email, password string) (string, *user.User, error)
-	ChangePassword(ctx context.Context, id uuid.UUID, password string, password2 string) error
-	Logout(ctx context.Context, tokenString string) error
-}
-
 type authService struct {
 	repo      user.IRepository
 	cacheRepo ICacheRepository
 	jwtSecret []byte
 }
 
-func NewAuthService(repo user.IRepository, cacheRepo ICacheRepository, secret string) IService {
+func NewAuthService(repo user.IRepository, cacheRepo ICacheRepository, secret string) user.IService {
 	return &authService{
 		repo:      repo,
 		cacheRepo: cacheRepo,
@@ -158,4 +151,55 @@ func (s *authService) Logout(ctx context.Context, tokenString string) error {
 	}
 
 	return nil
+}
+
+func (s *authService) ForgotPassword(ctx context.Context, email string) error {
+	foundUser, err := s.repo.FindByEmail(ctx, email)
+	if err != nil {
+		return err
+	}
+	if foundUser == nil {
+		log.Printf("[INFO] Password recovery requested for non-existent email: %s", email)
+		return nil
+	}
+
+	resetToken := uuid.New().String()
+	ttl := 30 * time.Minute
+
+	err = s.cacheRepo.SaveResetToken(ctx, foundUser.ID.String(), resetToken, ttl)
+	if err != nil {
+		log.Printf("[ERROR] Failed to save reset token to cache for user %s: %v", foundUser.ID, err)
+		return errors.New("internal error during token generation")
+	}
+
+	log.Printf("[INFO] Password reset token generated for user %s: %s", foundUser.ID, resetToken)
+
+	return nil
+}
+
+// ... em internal/domain/auth/auth_service.go
+
+// ResetPassword verifica o token no cache, o consome e atualiza a senha no DB
+func (s *authService) ResetPassword(ctx context.Context, resetToken string, newPassword string) error {
+	// 1. Verifica no Redis se o token existe E o consome (deleta atomicamente)
+	userIDString, err := s.cacheRepo.VerifyAndConsumeResetToken(ctx, resetToken)
+	if err != nil {
+		// Retorna erro se o token for inválido, expirado ou já tiver sido usado.
+		return errors.New("invalid or expired reset token")
+	}
+
+	// 2. Converte o UserID (string) para UUID
+	userID, err := uuid.Parse(userIDString)
+	if err != nil {
+		return errors.New("invalid user ID associated with token")
+	}
+
+	// 3. Gera o hash da nova senha
+	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+
+	// 4. Atualiza a senha no PostgreSQL (Chama o método UpdatePasswordHash que já criamos)
+	return s.repo.UpdatePasswordHash(ctx, userID, string(newHash))
 }

@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/auth"
 	"github.com/redis/go-redis/v9"
 	"time"
@@ -25,4 +26,28 @@ func (r *cacheRepository) IsTokenBlacklisted(ctx context.Context, jti string) (b
 		return false, cmd.Err()
 	}
 	return cmd.Val() == 1, nil
+}
+
+func (r *cacheRepository) SaveResetToken(ctx context.Context, userID string, resetToken string, ttl time.Duration) error {
+	return r.client.Set(ctx, resetToken, userID, ttl).Err()
+}
+
+func (r *cacheRepository) VerifyAndConsumeResetToken(ctx context.Context, resetToken string) (string, error) {
+
+	cmd := r.client.GetDel(ctx, resetToken)
+
+	if cmd.Err() != nil {
+		if errors.Is(cmd.Err(), redis.Nil) {
+			return "", errors.New("reset token is invalid or expired")
+		}
+		return "", cmd.Err()
+	}
+
+	userID := cmd.Val()
+
+	if userID == "" {
+		return "", errors.New("reset token is invalid or expired")
+	}
+
+	return userID, nil
 }
