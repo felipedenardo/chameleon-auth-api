@@ -12,4 +12,6 @@ type IService interface {
 	Logout(ctx context.Context, token string) error
 	ForgotPassword(ctx context.Context, email string) error
 	ResetPassword(ctx context.Context, resetToken string, newPassword string) error
+	DeactivateSelf(ctx context.Context, userID uuid.UUID, currentPassword string) error
+	UpdateUserStatus(ctx context.Context, userID uuid.UUID, status string) error
 }

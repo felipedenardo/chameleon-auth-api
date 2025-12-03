@@ -70,3 +70,17 @@ func (r *userRepository) UpdateLastLoginAt(ctx context.Context, userID uuid.UUID
 	}
 	return nil
 }
+
+func (r *userRepository) UpdateStatus(ctx context.Context, userID uuid.UUID, status string) error {
+	result := r.db.WithContext(ctx).Model(&user.User{}).
+		Where("id = ?", userID).
+		Update("status", status)
+
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("user not found or status already set")
+	}
+	return nil
+}

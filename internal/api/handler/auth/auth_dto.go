@@ -55,3 +55,11 @@ type ResetPasswordRequest struct {
 	NewPassword     string `json:"new_password" validate:"required,min=8"`
 	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=NewPassword"`
 }
+
+type DeactivateRequest struct {
+	CurrentPassword string `json:"current_password" validate:"required"`
+}
+
+type StatusUpdateRequest struct {
+	NewStatus string `json:"status" validate:"required,oneof=active inactive suspended"`
+}

@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"fmt"
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	httphelpers "github.com/felipedenardo/chameleon-common/pkg/http"
 	"github.com/felipedenardo/chameleon-common/pkg/middleware"
@@ -223,4 +224,99 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 	}
 
 	httphelpers.RespondOK(c, gin.H{"message": "Senha alterada com sucesso."})
+}
+
+// DeactivateSelf godoc
+// @Summary Desativa a própria conta do usuário
+// @Description Exige a senha atual para confirmar a intenção e desativa o status do usuário (soft delete).
+// @Tags Auth
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param request body DeactivateRequest true "Senha atual do usuário"
+// @Success 200 {object} response.Standard
+// @Failure 401 {object} response.Standard
+// @Failure 400 {object} response.Standard
+// @Router /auth/deactivate [post]
+func (h *Handler) DeactivateSelf(c *gin.Context) {
+	var req DeactivateRequest
+
+	userIDString, exists := c.Get("userID")
+	if !exists {
+		httphelpers.RespondUnauthorized(c, "Authentication context missing")
+		return
+	}
+
+	userID, err := uuid.Parse(userIDString.(string))
+	if err != nil {
+		httphelpers.RespondParamError(c, "user_id", "Invalid user id in token")
+		return
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httphelpers.RespondBindingError(c, err)
+		return
+	}
+
+	err = h.service.DeactivateSelf(
+		c.Request.Context(),
+		userID,
+		req.CurrentPassword,
+	)
+
+	if err != nil {
+		if errors.Is(err, errors.New("invalid current password")) {
+			httphelpers.RespondDomainFail(c, err.Error())
+			return
+		}
+		httphelpers.RespondInternalError(c, err)
+		return
+	}
+
+	httphelpers.RespondOK(c, gin.H{"message": "Account deactivated successfully."})
+}
+
+// UpdateUserStatus godoc
+// @Summary Atualiza o status de um usuário (Admin-only)
+// @Description Permite ao Admin banir, suspender ou reativar um usuário.
+// @Tags Admin
+// @Security ApiKeyAuth
+// @Accept json
+// @Produce json
+// @Param id path string true "ID do usuário a ser atualizado"
+// @Param request body StatusUpdateRequest true "Novo status"
+// @Success 200 {object} response.Standard
+// @Failure 401 {object} response.Standard
+// @Failure 403 {object} response.Standard
+// @Router /admin/users/{id}/status [put]
+func (h *Handler) UpdateUserStatus(c *gin.Context) {
+	var req StatusUpdateRequest
+
+	requesterRole, _ := c.Get("role")
+	targetUserID := c.Param("id")
+
+	if requesterRole != "admin" {
+		httphelpers.RespondUnauthorized(c, "Acesso negado. Apenas administradores podem alterar o status de outros usuários.")
+		return
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httphelpers.RespondBindingError(c, err)
+		return
+	}
+
+	userID, err := uuid.Parse(targetUserID)
+	if err != nil {
+		httphelpers.RespondParamError(c, "id", "ID de usuário inválido na URL")
+		return
+	}
+
+	err = h.service.UpdateUserStatus(c.Request.Context(), userID, req.NewStatus)
+
+	if err != nil {
+		httphelpers.RespondInternalError(c, err)
+		return
+	}
+
+	httphelpers.RespondOK(c, gin.H{"message": fmt.Sprintf("Status do usuário %s alterado para %s.", targetUserID, req.NewStatus)})
 }

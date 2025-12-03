@@ -56,6 +56,12 @@ func SetupRouter(handlers *HandlerContainer, cfg *config.Config) *gin.Engine {
 		{
 			protectedAuthRoutes.POST("/change-password", handlers.AuthHandler.ChangePassword)
 			protectedAuthRoutes.POST("/logout", handlers.AuthHandler.Logout)
+			protectedAuthRoutes.POST("/deactivate", handlers.AuthHandler.DeactivateSelf)
+		}
+
+		adminRoutes := api.Group("/admin").Use(authMiddleware)
+		{
+			adminRoutes.PUT("/users/:id/status", handlers.AuthHandler.UpdateUserStatus)
 		}
 
 		api.GET("/health", func(c *gin.Context) {

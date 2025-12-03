@@ -68,6 +68,10 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 		return "", nil, errors.New("invalid credentials")
 	}
 
+	if foundUser.Status != "active" {
+		return "", nil, errors.New("account is inactive or suspended")
+	}
+
 	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.PasswordHash), []byte(password)); err != nil {
 		return "", nil, errors.New("invalid credentials")
 	}
@@ -177,29 +181,41 @@ func (s *authService) ForgotPassword(ctx context.Context, email string) error {
 	return nil
 }
 
-// ... em internal/domain/auth/auth_service.go
-
-// ResetPassword verifica o token no cache, o consome e atualiza a senha no DB
 func (s *authService) ResetPassword(ctx context.Context, resetToken string, newPassword string) error {
-	// 1. Verifica no Redis se o token existe E o consome (deleta atomicamente)
 	userIDString, err := s.cacheRepo.VerifyAndConsumeResetToken(ctx, resetToken)
 	if err != nil {
-		// Retorna erro se o token for inválido, expirado ou já tiver sido usado.
 		return errors.New("invalid or expired reset token")
 	}
 
-	// 2. Converte o UserID (string) para UUID
 	userID, err := uuid.Parse(userIDString)
 	if err != nil {
 		return errors.New("invalid user ID associated with token")
 	}
 
-	// 3. Gera o hash da nova senha
 	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
 
-	// 4. Atualiza a senha no PostgreSQL (Chama o método UpdatePasswordHash que já criamos)
 	return s.repo.UpdatePasswordHash(ctx, userID, string(newHash))
+}
+
+func (s *authService) DeactivateSelf(ctx context.Context, userID uuid.UUID, currentPassword string) error {
+	foundUser, err := s.repo.FindByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if foundUser == nil {
+		return errors.New("user not found")
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.PasswordHash), []byte(currentPassword)); err != nil {
+		return errors.New("invalid current password")
+	}
+
+	return s.repo.UpdateStatus(ctx, userID, "inactive")
+}
+
+func (s *authService) UpdateUserStatus(ctx context.Context, userID uuid.UUID, status string) error {
+	return s.repo.UpdateStatus(ctx, userID, status)
 }
