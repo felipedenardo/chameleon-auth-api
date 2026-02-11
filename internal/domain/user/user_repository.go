@@ -14,4 +14,5 @@ type IRepository interface {
 	UpdateLastLoginAt(ctx context.Context, userID uuid.UUID) error
 	UpdateStatus(ctx context.Context, userID uuid.UUID, status string) error
 	IncrementTokenVersion(ctx context.Context, userID uuid.UUID) error
+	GetUserTokenVersion(ctx context.Context, userID string) (int, error)
 }

@@ -5,6 +5,7 @@ import (
 	authhandler "github.com/felipedenardo/chameleon-auth-api/internal/api/handler/auth"
 	"github.com/felipedenardo/chameleon-auth-api/internal/config"
 	authdomain "github.com/felipedenardo/chameleon-auth-api/internal/domain/auth"
+	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	"github.com/felipedenardo/chameleon-auth-api/internal/infra/database/postgresql/repository"
 	redisrepository "github.com/felipedenardo/chameleon-auth-api/internal/infra/database/redis"
 	"github.com/felipedenardo/chameleon-common/pkg/middleware"
@@ -18,17 +19,19 @@ import (
 type HandlerContainer struct {
 	AuthHandler *authhandler.Handler
 	RedisClient *redis.Client
+	UserRepo    user.IRepository
 }
 
 func NewHandlerContainer(db *gorm.DB, cfg *config.Config, redisClient *redis.Client) *HandlerContainer {
+	userRepo := repository.NewUserRepository(db)
 	return &HandlerContainer{
-		AuthHandler: newAuthHandler(db, cfg, redisClient),
+		AuthHandler: newAuthHandler(cfg, redisClient, userRepo),
 		RedisClient: redisClient,
+		UserRepo:    userRepo,
 	}
 }
 
-func newAuthHandler(db *gorm.DB, cfg *config.Config, redisClient *redis.Client) *authhandler.Handler {
-	userRepo := repository.NewUserRepository(db)
+func newAuthHandler(cfg *config.Config, redisClient *redis.Client, userRepo user.IRepository) *authhandler.Handler {
 	cacheRepo := redisrepository.NewCacheRepository(redisClient)
 	authService := authdomain.NewAuthService(userRepo, cacheRepo, cfg.JWTSecret)
 	return authhandler.NewAuthHandler(authService)
@@ -37,7 +40,9 @@ func newAuthHandler(db *gorm.DB, cfg *config.Config, redisClient *redis.Client) 
 func SetupRouter(handlers *HandlerContainer, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 
-	cacheRepoForMiddleware := redisrepository.NewCacheRepository(handlers.RedisClient)
+	cacheRepo := redisrepository.NewCacheRepository(handlers.RedisClient)
+
+	tokenManager := redisrepository.NewTokenVersionManager(cacheRepo, handlers.UserRepo)
 
 	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
@@ -51,7 +56,8 @@ func SetupRouter(handlers *HandlerContainer, cfg *config.Config) *gin.Engine {
 			authRoutes.POST("/reset-password", handlers.AuthHandler.ResetPassword)
 		}
 
-		authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret, cacheRepoForMiddleware)
+		authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret, cacheRepo, tokenManager)
+
 		protectedAuthRoutes := api.Group("/auth").Use(authMiddleware)
 		{
 			protectedAuthRoutes.POST("/change-password", handlers.AuthHandler.ChangePassword)

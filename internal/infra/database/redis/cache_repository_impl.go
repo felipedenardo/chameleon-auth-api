@@ -51,3 +51,19 @@ func (r *cacheRepository) VerifyAndConsumeResetToken(ctx context.Context, resetT
 
 	return userID, nil
 }
+func (r *cacheRepository) GetUserTokenVersion(ctx context.Context, key string) (int, error) {
+	val, err := r.client.Get(ctx, key).Int()
+	if err != nil {
+		return 0, err
+	}
+
+	return val, nil
+}
+
+func (r *cacheRepository) SetTokenVersion(ctx context.Context, key string, version int, expiration time.Duration) error {
+	err := r.client.Set(ctx, key, version, expiration).Err()
+	if err != nil {
+		return err
+	}
+	return nil
+}

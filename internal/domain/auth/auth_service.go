@@ -149,14 +149,6 @@ func (s *authService) Logout(ctx context.Context, tokenString string) error {
 	return s.invalidateToken(ctx, tokenString)
 }
 
-func (s *authService) LogoutAll(ctx context.Context, userID uuid.UUID, tokenString string) error {
-	err := s.repo.IncrementTokenVersion(ctx, userID)
-	if err != nil {
-		return fmt.Errorf("failed to increment token version during logout all: %w", err)
-	}
-	return s.invalidateToken(ctx, tokenString)
-}
-
 func (s *authService) ForgotPassword(ctx context.Context, email string) error {
 	foundUser, err := s.repo.FindByEmail(ctx, email)
 	if err != nil {

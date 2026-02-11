@@ -24,8 +24,6 @@ COPY --from=builder /app/chameleon-auth-api .
 
 COPY --from=builder /app/docs ./docs
 
-COPY .env .
-
 EXPOSE 8081
 
 CMD ["./chameleon-auth-api"]

@@ -99,3 +99,22 @@ func (r *userRepository) IncrementTokenVersion(ctx context.Context, userID uuid.
 	}
 	return nil
 }
+
+func (r *userRepository) GetUserTokenVersion(ctx context.Context, userID string) (int, error) {
+	var version int
+	result := r.db.WithContext(ctx).
+		Model(&user.User{}).
+		Select("token_version").
+		Where("id = ?", userID).
+		Scan(&version)
+
+	if result.Error != nil {
+		return 0, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return 0, errors.New("user not found")
+	}
+
+	return version, nil
+}
