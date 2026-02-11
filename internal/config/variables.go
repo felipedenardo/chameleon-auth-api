@@ -20,6 +20,7 @@ type Config struct {
 	RedisDB       int
 	JWTSecret     string
 	Port          string
+	AppBasePath   string
 }
 
 func Load() *Config {
@@ -37,6 +38,7 @@ func Load() *Config {
 		RedisDB:       getEnvInt("REDIS_DB", 0),
 		JWTSecret:     os.Getenv("JWT_SECRET"),
 		Port:          getEnv("SERVER_PORT", "8081"),
+		AppBasePath:   getEnv("APP_BASE_PATH", "/chameleon-auth"),
 	}
 
 	if cfg.JWTSecret == "" {

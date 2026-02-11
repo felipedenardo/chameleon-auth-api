@@ -43,7 +43,7 @@ func SetupRouter(handlers *HandlerContainer, cfg *config.Config) *gin.Engine {
 	cacheRepo := redisrepository.NewCacheRepository(handlers.RedisClient)
 	tokenManager := redisrepository.NewTokenVersionManager(cacheRepo, handlers.UserRepo)
 
-	basePath := r.Group("/chameleon-auth")
+	basePath := r.Group(cfg.AppBasePath)
 	{
 		basePath.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 

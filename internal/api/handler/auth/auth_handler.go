@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/felipedenardo/chameleon-auth-api/internal/domain/auth"
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	httphelpers "github.com/felipedenardo/chameleon-common/pkg/http"
 	"github.com/felipedenardo/chameleon-common/pkg/middleware"
@@ -40,7 +41,7 @@ func (h *Handler) Register(c *gin.Context) {
 
 	userDomain, err := h.service.Register(c.Request.Context(), req.Name, req.Email, req.Password, req.Role)
 	if err != nil {
-		if errors.Is(err, errors.New("email already exists")) {
+		if errors.Is(err, auth.ErrEmailAlreadyExists) {
 			httphelpers.RespondDomainFail(c, err.Error())
 			return
 		}
@@ -127,8 +128,8 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 	)
 
 	if err != nil {
-		if errors.Is(err, errors.New("invalid current password")) ||
-			errors.Is(err, errors.New("new password cannot be the same as the current password")) {
+		if errors.Is(err, auth.ErrInvalidCurrentPassword) ||
+			errors.Is(err, auth.ErrSamePassword) {
 			httphelpers.RespondDomainFail(c, err.Error())
 			return
 		}
@@ -280,7 +281,7 @@ func (h *Handler) DeactivateSelf(c *gin.Context) {
 	)
 
 	if err != nil {
-		if errors.Is(err, errors.New("invalid current password")) {
+		if errors.Is(err, auth.ErrInvalidCurrentPassword) {
 			httphelpers.RespondDomainFail(c, err.Error())
 			return
 		}

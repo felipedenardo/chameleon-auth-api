@@ -34,7 +34,7 @@ func (s *authService) Register(ctx context.Context, name, email, password, role 
 		return nil, err
 	}
 	if existing != nil {
-		return nil, errors.New("email already exists")
+		return nil, ErrEmailAlreadyExists
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -67,15 +67,15 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 	}
 
 	if foundUser == nil {
-		return "", nil, errors.New("invalid credentials")
+		return "", nil, ErrInvalidCredentials
 	}
 
 	if foundUser.Status != "active" {
-		return "", nil, errors.New("account is inactive or suspended")
+		return "", nil, ErrAccountInactive
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.PasswordHash), []byte(password)); err != nil {
-		return "", nil, errors.New("invalid credentials")
+		return "", nil, ErrInvalidCredentials
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
@@ -92,13 +92,13 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 		return "", nil, err
 	}
 
-	go func() {
-		err = s.repo.UpdateLastLoginAt(context.Background(), foundUser.ID)
+	go func(userID uuid.UUID) {
+		// Use Background context for operations that must survive the original request context
+		err = s.repo.UpdateLastLoginAt(context.Background(), userID)
 		if err != nil {
-			log.Printf("[ERROR] Failed to update last_login_at for user %s: %v", foundUser.ID.String(), err)
-			return
+			log.Printf("[ERROR] Failed to update last_login_at for user %s: %v", userID.String(), err)
 		}
-	}()
+	}(foundUser.ID)
 
 	return tokenString, foundUser, nil
 }
@@ -109,16 +109,11 @@ func (s *authService) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 		return err
 	}
 
-	if foundUser == nil {
-		return errors.New("user not found")
-	}
-
 	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.PasswordHash), []byte(currentPassword)); err != nil {
-		return errors.New("invalid current password")
+		return ErrInvalidCurrentPassword
 	}
-
 	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.PasswordHash), []byte(newPassword)); err == nil {
-		return errors.New("new password cannot be the same as the current password")
+		return ErrSamePassword
 	}
 
 	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
@@ -176,12 +171,12 @@ func (s *authService) ForgotPassword(ctx context.Context, email string) error {
 func (s *authService) ResetPassword(ctx context.Context, resetToken string, newPassword string) error {
 	userIDString, err := s.cacheRepo.VerifyAndConsumeResetToken(ctx, resetToken)
 	if err != nil {
-		return errors.New("invalid or expired reset token")
+		return ErrInvalidResetToken
 	}
 
 	userID, err := uuid.Parse(userIDString)
 	if err != nil {
-		return errors.New("invalid user ID associated with token")
+		return ErrInvalidUserID
 	}
 
 	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
@@ -207,7 +202,7 @@ func (s *authService) DeactivateSelf(ctx context.Context, userID uuid.UUID, curr
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(foundUser.PasswordHash), []byte(currentPassword)); err != nil {
-		return errors.New("invalid current password")
+		return ErrInvalidCurrentPassword
 	}
 
 	err = s.repo.UpdateStatus(ctx, userID, "inactive")
