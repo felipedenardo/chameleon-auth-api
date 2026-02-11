@@ -93,7 +93,7 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 	}
 
 	go func() {
-		err := s.repo.UpdateLastLoginAt(context.Background(), foundUser.ID)
+		err = s.repo.UpdateLastLoginAt(context.Background(), foundUser.ID)
 		if err != nil {
 			log.Printf("[ERROR] Failed to update last_login_at for user %s: %v", foundUser.ID.String(), err)
 			return

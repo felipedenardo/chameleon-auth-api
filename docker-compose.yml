@@ -3,22 +3,30 @@ version: '3.8'
 services:
   auth_api:
     build: .
+    container_name: chameleon_auth_api
     ports:
       - "8081:8081"
     depends_on:
       - auth_db
+      - redis_cache
     environment:
       - DB_HOST=auth
       - DB_PORT=5432
       - DB_USER=auth
       - DB_PASSWORD=auth
       - DB_NAME=auth
+      - REDIS_HOST=redis_cache
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - REDIS_DB=0
+      - JWT_SECRET=chameleon-api-secret-2026
       - SERVER_PORT=8081
     networks:
       - microservices-net
 
   auth_db:
     image: postgres:15-alpine
+    container_name: chameleon_auth_db
     environment:
       POSTGRES_USER: auth
       POSTGRES_PASSWORD: auth
@@ -30,11 +38,11 @@ services:
     networks:
       microservices-net:
         aliases:
-          - auth # Permite que o DB seja acessado pelo host "auth" dentro da rede Docker
+          - auth
 
   redis_cache:
     image: redis:7-alpine
-    container_name: auth_redis
+    container_name: chameleon_auth_redis
     ports:
       - "6379:6379"
     networks:

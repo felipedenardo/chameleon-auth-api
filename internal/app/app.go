@@ -41,38 +41,40 @@ func SetupRouter(handlers *HandlerContainer, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
 
 	cacheRepo := redisrepository.NewCacheRepository(handlers.RedisClient)
-
 	tokenManager := redisrepository.NewTokenVersionManager(cacheRepo, handlers.UserRepo)
 
-	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-	api := r.Group("/api/v1")
+	basePath := r.Group("/chameleon-auth")
 	{
-		authRoutes := api.Group("/auth")
+		basePath.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
+		api := basePath.Group("/api/v1")
 		{
-			authRoutes.POST("/register", handlers.AuthHandler.Register)
-			authRoutes.POST("/login", handlers.AuthHandler.Login)
-			authRoutes.POST("/forgot-password", handlers.AuthHandler.ForgotPassword)
-			authRoutes.POST("/reset-password", handlers.AuthHandler.ResetPassword)
+			authRoutes := api.Group("/auth")
+			{
+				authRoutes.POST("/register", handlers.AuthHandler.Register)
+				authRoutes.POST("/login", handlers.AuthHandler.Login)
+				authRoutes.POST("/forgot-password", handlers.AuthHandler.ForgotPassword)
+				authRoutes.POST("/reset-password", handlers.AuthHandler.ResetPassword)
+			}
+
+			authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret, cacheRepo, tokenManager)
+
+			protectedAuthRoutes := api.Group("/auth").Use(authMiddleware)
+			{
+				protectedAuthRoutes.POST("/change-password", handlers.AuthHandler.ChangePassword)
+				protectedAuthRoutes.POST("/logout", handlers.AuthHandler.Logout)
+				protectedAuthRoutes.POST("/deactivate", handlers.AuthHandler.DeactivateSelf)
+			}
+
+			adminRoutes := api.Group("/admin").Use(authMiddleware)
+			{
+				adminRoutes.PUT("/users/:id/status", handlers.AuthHandler.UpdateUserStatus)
+			}
+
+			api.GET("/health", func(c *gin.Context) {
+				c.JSON(200, gin.H{"status": "ok", "service": "auth-api"})
+			})
 		}
-
-		authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret, cacheRepo, tokenManager)
-
-		protectedAuthRoutes := api.Group("/auth").Use(authMiddleware)
-		{
-			protectedAuthRoutes.POST("/change-password", handlers.AuthHandler.ChangePassword)
-			protectedAuthRoutes.POST("/logout", handlers.AuthHandler.Logout)
-			protectedAuthRoutes.POST("/deactivate", handlers.AuthHandler.DeactivateSelf)
-		}
-
-		adminRoutes := api.Group("/admin").Use(authMiddleware)
-		{
-			adminRoutes.PUT("/users/:id/status", handlers.AuthHandler.UpdateUserStatus)
-		}
-
-		api.GET("/health", func(c *gin.Context) {
-			c.JSON(200, gin.H{"status": "ok", "service": "auth-api"})
-		})
 	}
 
 	return r

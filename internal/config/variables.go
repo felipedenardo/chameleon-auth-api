@@ -1,8 +1,11 @@
 package config
 
 import (
+	"log"
 	"os"
 	"strconv"
+
+	"github.com/joho/godotenv"
 )
 
 type Config struct {
@@ -20,20 +23,40 @@ type Config struct {
 }
 
 func Load() *Config {
+	_ = godotenv.Load()
 
-	redisDB, _ := strconv.Atoi(os.Getenv("REDIS_DB"))
-
-	return &Config{
-		DBHost:        os.Getenv("DB_HOST"),
-		DBPort:        os.Getenv("DB_PORT"),
-		DBUser:        os.Getenv("DB_USER"),
-		DBPassword:    os.Getenv("DB_PASSWORD"),
-		DBName:        os.Getenv("DB_NAME"),
-		RedisHost:     os.Getenv("REDIS_HOST"),
-		RedisPort:     os.Getenv("REDIS_PORT"),
+	cfg := &Config{
+		DBHost:        getEnv("DB_HOST", "localhost"),
+		DBPort:        getEnv("DB_PORT", "5432"),
+		DBUser:        getEnv("DB_USER", ""),
+		DBPassword:    getEnv("DB_PASSWORD", ""),
+		DBName:        getEnv("DB_NAME", ""),
+		RedisHost:     getEnv("REDIS_HOST", "localhost"),
+		RedisPort:     getEnv("REDIS_PORT", "6379"),
 		RedisPassword: os.Getenv("REDIS_PASSWORD"),
-		RedisDB:       redisDB,
+		RedisDB:       getEnvInt("REDIS_DB", 0),
 		JWTSecret:     os.Getenv("JWT_SECRET"),
-		Port:          os.Getenv("SERVER_PORT"),
+		Port:          getEnv("SERVER_PORT", "8081"),
 	}
+
+	if cfg.JWTSecret == "" {
+		log.Fatal("[FATAL] JWT_SECRET is required but not set")
+	}
+
+	return cfg
+}
+
+func getEnv(key, fallback string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return fallback
+}
+
+func getEnvInt(key string, fallback int) int {
+	valueStr := os.Getenv(key)
+	if value, err := strconv.Atoi(valueStr); err == nil {
+		return value
+	}
+	return fallback
 }
