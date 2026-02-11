@@ -1,8 +1,9 @@
 package user
 
 import (
-	"github.com/felipedenardo/chameleon-common/pkg/base"
 	"time"
+
+	"github.com/felipedenardo/chameleon-common/pkg/base"
 )
 
 type User struct {
@@ -13,4 +14,5 @@ type User struct {
 	Role         string     `json:"role"`
 	Status       string     `json:"status"`
 	LastLoginAt  *time.Time `gorm:"column:last_login_at" json:"last_login_at,omitempty"`
+	TokenVersion int        `gorm:"column:token_version;default:0" json:"-"`
 }

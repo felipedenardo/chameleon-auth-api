@@ -3,10 +3,11 @@ package repository
 import (
 	"context"
 	"errors"
+	"time"
+
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
-	"time"
 )
 
 type userRepository struct {
@@ -81,6 +82,20 @@ func (r *userRepository) UpdateStatus(ctx context.Context, userID uuid.UUID, sta
 	}
 	if result.RowsAffected == 0 {
 		return errors.New("user not found or status already set")
+	}
+	return nil
+}
+
+func (r *userRepository) IncrementTokenVersion(ctx context.Context, userID uuid.UUID) error {
+	result := r.db.WithContext(ctx).Model(&user.User{}).
+		Where("id = ?", userID).
+		Update("token_version", gorm.Expr("token_version + ?", 1))
+
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return errors.New("user not found")
 	}
 	return nil
 }

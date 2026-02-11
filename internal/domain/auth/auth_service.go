@@ -3,13 +3,15 @@ package auth
 import (
 	"context"
 	"errors"
+	"fmt"
+	"log"
+	"time"
+
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	"github.com/felipedenardo/chameleon-common/pkg/base"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
-	"log"
-	"time"
 )
 
 type authService struct {
@@ -77,11 +79,12 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 	}
 
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub":  foundUser.ID.String(),
-		"role": foundUser.Role,
-		"name": foundUser.Name,
-		"exp":  time.Now().Add(time.Hour * 24).Unix(),
-		"jti":  uuid.New().String(),
+		"sub":           foundUser.ID.String(),
+		"role":          foundUser.Role,
+		"name":          foundUser.Name,
+		"token_version": foundUser.TokenVersion,
+		"exp":           time.Now().Add(time.Hour * 24).Unix(),
+		"jti":           uuid.New().String(),
 	})
 
 	tokenString, err := token.SignedString(s.jwtSecret)
@@ -100,7 +103,7 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 	return tokenString, foundUser, nil
 }
 
-func (s *authService) ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword string, newPassword string) error {
+func (s *authService) ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword string, newPassword string, tokenString string) error {
 	foundUser, err := s.repo.FindByID(ctx, userID)
 	if err != nil {
 		return err
@@ -123,38 +126,35 @@ func (s *authService) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 		return err
 	}
 
-	return s.repo.UpdatePasswordHash(ctx, userID, string(newHash))
+	err = s.repo.UpdatePasswordHash(ctx, userID, string(newHash))
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.IncrementTokenVersion(ctx, userID)
+	if err != nil {
+		log.Printf("[ERROR] Failed to increment token version for user %s: %v", userID, err)
+		// Non-blocking error, but should be logged.
+	}
+
+	err = s.invalidateToken(ctx, tokenString)
+	if err != nil {
+		return fmt.Errorf("failed to invalidate token after password change: %v", err)
+	}
+
+	return err
 }
 
 func (s *authService) Logout(ctx context.Context, tokenString string) error {
+	return s.invalidateToken(ctx, tokenString)
+}
 
-	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
+func (s *authService) LogoutAll(ctx context.Context, userID uuid.UUID, tokenString string) error {
+	err := s.repo.IncrementTokenVersion(ctx, userID)
 	if err != nil {
-		return errors.New("invalid token format")
+		return fmt.Errorf("failed to increment token version during logout all: %w", err)
 	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok {
-		return errors.New("invalid token claims")
-	}
-
-	jti, ok := claims["jti"].(string)
-	if !ok {
-		return errors.New("jti claim missing")
-	}
-
-	expTime, ok := claims["exp"].(float64)
-	if !ok {
-		return errors.New("expiration claim missing")
-	}
-
-	ttl := time.Unix(int64(expTime), 0).Sub(time.Now())
-
-	if ttl > 0 {
-		return s.cacheRepo.BlacklistToken(ctx, jti, ttl)
-	}
-
-	return nil
+	return s.invalidateToken(ctx, tokenString)
 }
 
 func (s *authService) ForgotPassword(ctx context.Context, email string) error {
@@ -200,7 +200,7 @@ func (s *authService) ResetPassword(ctx context.Context, resetToken string, newP
 	return s.repo.UpdatePasswordHash(ctx, userID, string(newHash))
 }
 
-func (s *authService) DeactivateSelf(ctx context.Context, userID uuid.UUID, currentPassword string) error {
+func (s *authService) DeactivateSelf(ctx context.Context, userID uuid.UUID, currentPassword string, tokenString string) error {
 	foundUser, err := s.repo.FindByID(ctx, userID)
 	if err != nil {
 		return err
@@ -213,9 +213,46 @@ func (s *authService) DeactivateSelf(ctx context.Context, userID uuid.UUID, curr
 		return errors.New("invalid current password")
 	}
 
-	return s.repo.UpdateStatus(ctx, userID, "inactive")
+	err = s.repo.UpdateStatus(ctx, userID, "inactive")
+	if err != nil {
+		return err
+	}
+
+	err = s.repo.IncrementTokenVersion(ctx, userID)
+	if err != nil {
+		log.Printf("[ERROR] Failed to increment token version for user %s: %v", userID, err)
+	}
+
+	err = s.invalidateToken(ctx, tokenString)
+	if err != nil {
+		return fmt.Errorf("failed to invalidate token after deactivation: %w", err)
+	}
+
+	return err
 }
 
 func (s *authService) UpdateUserStatus(ctx context.Context, userID uuid.UUID, status string) error {
 	return s.repo.UpdateStatus(ctx, userID, status)
+}
+
+func (s *authService) invalidateToken(ctx context.Context, tokenString string) error {
+	token, _, err := new(jwt.Parser).ParseUnverified(tokenString, jwt.MapClaims{})
+	if err != nil {
+		return errors.New("formato de token inválido")
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return errors.New("claims inválidas")
+	}
+
+	jti, _ := claims["jti"].(string)
+	expTime, _ := claims["exp"].(float64)
+	ttl := time.Until(time.Unix(int64(expTime), 0))
+
+	if ttl > 0 && jti != "" {
+		return s.cacheRepo.BlacklistToken(ctx, jti, ttl)
+	}
+
+	return nil
 }

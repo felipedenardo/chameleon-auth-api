@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 )
 
@@ -12,4 +13,5 @@ type IRepository interface {
 	UpdatePasswordHash(ctx context.Context, userID uuid.UUID, newHash string) error
 	UpdateLastLoginAt(ctx context.Context, userID uuid.UUID) error
 	UpdateStatus(ctx context.Context, userID uuid.UUID, status string) error
+	IncrementTokenVersion(ctx context.Context, userID uuid.UUID) error
 }

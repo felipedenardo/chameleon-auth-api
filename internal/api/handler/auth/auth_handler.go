@@ -3,6 +3,7 @@ package auth
 import (
 	"errors"
 	"fmt"
+
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	httphelpers "github.com/felipedenardo/chameleon-common/pkg/http"
 	"github.com/felipedenardo/chameleon-common/pkg/middleware"
@@ -111,11 +112,18 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 
+	tokenString, exists := c.Get(middleware.RawTokenKey)
+	if !exists || tokenString == "" {
+		httphelpers.RespondUnauthorized(c, "Token não encontrado no contexto.")
+		return
+	}
+
 	err = h.service.ChangePassword(
 		c.Request.Context(),
 		userID,
 		req.CurrentPassword,
 		req.NewPassword,
+		tokenString.(string),
 	)
 
 	if err != nil {
@@ -258,10 +266,17 @@ func (h *Handler) DeactivateSelf(c *gin.Context) {
 		return
 	}
 
+	tokenString, exists := c.Get(middleware.RawTokenKey)
+	if !exists || tokenString == "" {
+		httphelpers.RespondUnauthorized(c, "Token não encontrado no contexto.")
+		return
+	}
+
 	err = h.service.DeactivateSelf(
 		c.Request.Context(),
 		userID,
 		req.CurrentPassword,
+		tokenString.(string),
 	)
 
 	if err != nil {

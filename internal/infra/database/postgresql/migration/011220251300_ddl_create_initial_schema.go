@@ -18,6 +18,7 @@ var ID011220251300DDLCreateInitialSchema = gormigrate.Migration{
              password_hash VARCHAR(255) NOT NULL,
              role VARCHAR(50) NOT NULL, 
              status VARCHAR(20) NOT NULL DEFAULT 'active',
+             token_version INT NOT NULL DEFAULT 0,
              last_login_at TIMESTAMP,
              created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
              updated_at TIMESTAMP,
