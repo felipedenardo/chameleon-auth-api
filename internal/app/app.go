@@ -49,26 +49,26 @@ func SetupRouter(handlers *HandlerContainer, cfg *config.Config) *gin.Engine {
 
 		api := basePath.Group("/api/v1")
 		{
-			authRoutes := api.Group("/auth")
+			public := api.Group("/")
 			{
-				authRoutes.POST("/register", handlers.AuthHandler.Register)
-				authRoutes.POST("/login", handlers.AuthHandler.Login)
-				authRoutes.POST("/forgot-password", handlers.AuthHandler.ForgotPassword)
-				authRoutes.POST("/reset-password", handlers.AuthHandler.ResetPassword)
+				public.POST("/register", handlers.AuthHandler.Register)
+				public.POST("/login", handlers.AuthHandler.Login)
+				public.POST("/forgot-password", handlers.AuthHandler.ForgotPassword)
+				public.POST("/reset-password", handlers.AuthHandler.ResetPassword)
 			}
 
 			authMiddleware := middleware.AuthMiddleware(cfg.JWTSecret, cacheRepo, tokenManager)
 
-			protectedAuthRoutes := api.Group("/auth").Use(authMiddleware)
+			protected := api.Group("/").Use(authMiddleware)
 			{
-				protectedAuthRoutes.POST("/change-password", handlers.AuthHandler.ChangePassword)
-				protectedAuthRoutes.POST("/logout", handlers.AuthHandler.Logout)
-				protectedAuthRoutes.POST("/deactivate", handlers.AuthHandler.DeactivateSelf)
+				protected.POST("/change-password", handlers.AuthHandler.ChangePassword)
+				protected.POST("/logout", handlers.AuthHandler.Logout)
+				protected.POST("/deactivate", handlers.AuthHandler.DeactivateSelf)
 			}
 
-			adminRoutes := api.Group("/admin").Use(authMiddleware)
+			admin := api.Group("/admin").Use(authMiddleware)
 			{
-				adminRoutes.PUT("/users/:id/status", handlers.AuthHandler.UpdateUserStatus)
+				admin.PUT("/users/:id/status", handlers.AuthHandler.UpdateUserStatus)
 			}
 
 			api.GET("/health", func(c *gin.Context) {

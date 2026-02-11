@@ -189,6 +189,11 @@ func (s *authService) ResetPassword(ctx context.Context, resetToken string, newP
 		return err
 	}
 
+	err = s.repo.IncrementTokenVersion(ctx, userID)
+	if err != nil {
+		log.Printf("[ERROR] Failed to increment token version for user %s: %v", userID, err)
+	}
+
 	return s.repo.UpdatePasswordHash(ctx, userID, string(newHash))
 }
 

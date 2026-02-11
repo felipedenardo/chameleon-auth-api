@@ -6,12 +6,17 @@ import (
 	"github.com/felipedenardo/chameleon-auth-api/internal/app"
 	"github.com/felipedenardo/chameleon-auth-api/internal/config"
 	"github.com/felipedenardo/chameleon-auth-api/internal/infra/database/postgresql/migration"
+	"github.com/felipedenardo/chameleon-common/pkg/validation"
+	"github.com/gin-gonic/gin/binding"
 	"github.com/go-gormigrate/gormigrate/v2"
+	"github.com/go-playground/validator/v10"
 	"github.com/joho/godotenv"
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"log"
+	"reflect"
+	"strings"
 )
 
 // @title Auth API Microservice (Chameleon System)
@@ -28,6 +33,9 @@ func main() {
 	if err := godotenv.Load(); err != nil {
 		log.Println("[INFO] No .env file found, using system environment variables.")
 	}
+
+	validation.SetupCustomValidator()
+
 	cfg := config.Load()
 
 	log.Printf("Starting Auth API on port %s...", cfg.Port)
@@ -83,4 +91,16 @@ func setupRedis(cfg *config.Config) *redis.Client {
 	log.Println("Redis connection established")
 
 	return redisClient
+}
+
+func init() {
+	if v, ok := binding.Validator.Engine().(*validator.Validate); ok {
+		v.RegisterTagNameFunc(func(fld reflect.StructField) string {
+			name := strings.SplitN(fld.Tag.Get("json"), ",", 2)[0]
+			if name == "-" {
+				return ""
+			}
+			return name
+		})
+	}
 }

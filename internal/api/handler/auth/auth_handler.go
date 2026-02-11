@@ -107,7 +107,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	if err := c.ShouldBindJSON(&req); err != nil {
+	if err = c.ShouldBindJSON(&req); err != nil {
 		httphelpers.RespondBindingError(c, err)
 		return
 	}

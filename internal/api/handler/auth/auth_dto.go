@@ -6,15 +6,16 @@ import (
 )
 
 type RegisterRequest struct {
-	Name     string `json:"name" validate:"required,min=3,max=100"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=6"`
-	Role     string `json:"role" validate:"required,oneof=admin professional"`
+	Name            string `json:"name" binding:"required,min=3,max=100"`
+	Email           string `json:"email" binding:"required,email"`
+	Password        string `json:"password" binding:"required,min=6"`
+	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=Password"`
+	Role            string `json:"role" binding:"required,oneof=admin professional"`
 }
 
 type LoginRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
+	Email    string `json:"email" binding:"required,email"`
+	Password string `json:"password" binding:"required"`
 }
 
 type UserResponse struct {
@@ -41,25 +42,25 @@ func ToUserResponse(u *user.User) UserResponse {
 }
 
 type ChangePasswordRequest struct {
-	CurrentPassword string `json:"current_password" validate:"required"`
-	NewPassword     string `json:"new_password" validate:"required,min=8"`
-	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=NewPassword"`
+	CurrentPassword    string `json:"current_password" binding:"required"`
+	NewPassword        string `json:"new_password" binding:"required,min=8"`
+	ConfirmNewPassword string `json:"confirm_new_password" binding:"required,eqfield=NewPassword"`
 }
 
 type ForgotPasswordRequest struct {
-	Email string `json:"email" validate:"required,email"`
+	Email string `json:"email" binding:"required,email"`
 }
 
 type ResetPasswordRequest struct {
-	Token           string `json:"token" validate:"required"`
-	NewPassword     string `json:"new_password" validate:"required,min=8"`
-	ConfirmPassword string `json:"confirm_password" validate:"required,eqfield=NewPassword"`
+	Token           string `json:"token" binding:"required"`
+	NewPassword     string `json:"new_password" binding:"required,min=8"`
+	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=NewPassword"`
 }
 
 type DeactivateRequest struct {
-	CurrentPassword string `json:"current_password" validate:"required"`
+	CurrentPassword string `json:"current_password" binding:"required"`
 }
 
 type StatusUpdateRequest struct {
-	NewStatus string `json:"status" validate:"required,oneof=active inactive suspended"`
+	NewStatus string `json:"status" binding:"required,oneof=active inactive suspended"`
 }
