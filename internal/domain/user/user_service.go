@@ -7,12 +7,12 @@ import (
 )
 
 type IService interface {
-	Register(ctx context.Context, name, email, password, role string) (*User, error)
+	Register(ctx context.Context, name, email, password string, role Role) (*User, error)
 	Login(ctx context.Context, email, password string) (string, *User, error)
 	ChangePassword(ctx context.Context, userID uuid.UUID, currentPassword string, newPassword string, tokenString string) error
 	Logout(ctx context.Context, tokenString string) error
 	ForgotPassword(ctx context.Context, email string) error
 	ResetPassword(ctx context.Context, resetToken string, newPassword string) error
 	DeactivateSelf(ctx context.Context, userID uuid.UUID, password, tokenString string) error
-	UpdateUserStatus(ctx context.Context, userID uuid.UUID, status string) error
+	UpdateUserStatus(ctx context.Context, userID uuid.UUID, status Status) error
 }

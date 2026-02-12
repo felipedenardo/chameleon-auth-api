@@ -5,6 +5,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/felipedenardo/chameleon-auth-api/internal/domain/auth"
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	"github.com/google/uuid"
 	"gorm.io/gorm"
@@ -53,7 +54,7 @@ func (r *userRepository) UpdatePasswordHash(ctx context.Context, userID uuid.UUI
 	}
 
 	if result.RowsAffected == 0 {
-		return errors.New("user not found or no changes applied")
+		return auth.ErrUserNotFound
 	}
 	return nil
 }
@@ -81,7 +82,7 @@ func (r *userRepository) UpdateStatus(ctx context.Context, userID uuid.UUID, sta
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return errors.New("user not found or status already set")
+		return auth.ErrUserNotFound
 	}
 	return nil
 }
@@ -95,7 +96,7 @@ func (r *userRepository) IncrementTokenVersion(ctx context.Context, userID uuid.
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return errors.New("user not found")
+		return auth.ErrUserNotFound
 	}
 	return nil
 }
@@ -113,7 +114,7 @@ func (r *userRepository) GetUserTokenVersion(ctx context.Context, userID string)
 	}
 
 	if result.RowsAffected == 0 {
-		return 0, errors.New("user not found")
+		return 0, auth.ErrUserNotFound
 	}
 
 	return version, nil

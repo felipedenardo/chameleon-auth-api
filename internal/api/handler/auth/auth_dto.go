@@ -36,8 +36,8 @@ func ToUserResponse(u *user.User) UserResponse {
 		ModelDTO: base.ToDTO(u.Model),
 		Name:     u.Name,
 		Email:    u.Email,
-		Role:     u.Role,
-		Status:   u.Status,
+		Role:     string(u.Role),
+		Status:   string(u.Status),
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"log"
 	"time"
 
+	"github.com/felipedenardo/chameleon-auth-api/internal/config"
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	"github.com/felipedenardo/chameleon-common/pkg/base"
 	"github.com/golang-jwt/jwt/v5"
@@ -17,18 +18,18 @@ import (
 type authService struct {
 	repo      user.IRepository
 	cacheRepo ICacheRepository
-	jwtSecret []byte
+	cfg       *config.Config
 }
 
-func NewAuthService(repo user.IRepository, cacheRepo ICacheRepository, secret string) user.IService {
+func NewAuthService(repo user.IRepository, cacheRepo ICacheRepository, cfg *config.Config) user.IService {
 	return &authService{
 		repo:      repo,
 		cacheRepo: cacheRepo,
-		jwtSecret: []byte(secret),
+		cfg:       cfg,
 	}
 }
 
-func (s *authService) Register(ctx context.Context, name, email, password, role string) (*user.User, error) {
+func (s *authService) Register(ctx context.Context, name, email, password string, role user.Role) (*user.User, error) {
 	existing, err := s.repo.FindByEmail(ctx, email)
 	if err != nil {
 		return nil, err
@@ -37,7 +38,7 @@ func (s *authService) Register(ctx context.Context, name, email, password, role 
 		return nil, ErrEmailAlreadyExists
 	}
 
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), s.cfg.BcryptCost)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +51,7 @@ func (s *authService) Register(ctx context.Context, name, email, password, role 
 		Email:        email,
 		PasswordHash: string(hash),
 		Role:         role,
-		Status:       "active",
+		Status:       user.StatusActive,
 	}
 
 	if err := s.repo.Create(ctx, newUser); err != nil {
@@ -83,11 +84,11 @@ func (s *authService) Login(ctx context.Context, email, password string) (string
 		"role":          foundUser.Role,
 		"name":          foundUser.Name,
 		"token_version": foundUser.TokenVersion,
-		"exp":           time.Now().Add(time.Hour * 24).Unix(),
+		"exp":           time.Now().Add(time.Duration(s.cfg.TokenTTLHours) * time.Hour).Unix(),
 		"jti":           uuid.New().String(),
 	})
 
-	tokenString, err := token.SignedString(s.jwtSecret)
+	tokenString, err := token.SignedString([]byte(s.cfg.JWTSecret))
 	if err != nil {
 		return "", nil, err
 	}
@@ -116,7 +117,7 @@ func (s *authService) ChangePassword(ctx context.Context, userID uuid.UUID, curr
 		return ErrSamePassword
 	}
 
-	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), s.cfg.BcryptCost)
 	if err != nil {
 		return err
 	}
@@ -155,7 +156,7 @@ func (s *authService) ForgotPassword(ctx context.Context, email string) error {
 	}
 
 	resetToken := uuid.New().String()
-	ttl := 30 * time.Minute
+	ttl := time.Duration(s.cfg.ResetTokenTTLMinutes) * time.Minute
 
 	err = s.cacheRepo.SaveResetToken(ctx, foundUser.ID.String(), resetToken, ttl)
 	if err != nil {
@@ -179,7 +180,7 @@ func (s *authService) ResetPassword(ctx context.Context, resetToken string, newP
 		return ErrInvalidUserID
 	}
 
-	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), bcrypt.DefaultCost)
+	newHash, err := bcrypt.GenerateFromPassword([]byte(newPassword), s.cfg.BcryptCost)
 	if err != nil {
 		return err
 	}
@@ -205,7 +206,7 @@ func (s *authService) DeactivateSelf(ctx context.Context, userID uuid.UUID, curr
 		return ErrInvalidCurrentPassword
 	}
 
-	err = s.repo.UpdateStatus(ctx, userID, "inactive")
+	err = s.repo.UpdateStatus(ctx, userID, string(user.StatusInactive))
 	if err != nil {
 		return err
 	}
@@ -223,8 +224,8 @@ func (s *authService) DeactivateSelf(ctx context.Context, userID uuid.UUID, curr
 	return err
 }
 
-func (s *authService) UpdateUserStatus(ctx context.Context, userID uuid.UUID, status string) error {
-	return s.repo.UpdateStatus(ctx, userID, status)
+func (s *authService) UpdateUserStatus(ctx context.Context, userID uuid.UUID, status user.Status) error {
+	return s.repo.UpdateStatus(ctx, userID, string(status))
 }
 
 func (s *authService) invalidateToken(ctx context.Context, tokenString string) error {

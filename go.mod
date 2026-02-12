@@ -3,7 +3,7 @@ module github.com/felipedenardo/chameleon-auth-api
 go 1.24.3
 
 require (
-	github.com/felipedenardo/chameleon-common v0.7.1
+	github.com/felipedenardo/chameleon-common v0.8.1
 	github.com/gin-gonic/gin v1.11.0
 	github.com/go-gormigrate/gormigrate/v2 v2.1.5
 	github.com/go-playground/validator/v10 v10.28.0

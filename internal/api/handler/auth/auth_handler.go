@@ -39,7 +39,7 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	userDomain, err := h.service.Register(c.Request.Context(), req.Name, req.Email, req.Password, req.Role)
+	userDomain, err := h.service.Register(c.Request.Context(), req.Name, req.Email, req.Password, user.Role(req.Role))
 	if err != nil {
 		if errors.Is(err, auth.ErrEmailAlreadyExists) {
 			httphelpers.RespondDomainFail(c, err.Error())
@@ -96,13 +96,12 @@ func (h *Handler) Login(c *gin.Context) {
 func (h *Handler) ChangePassword(c *gin.Context) {
 	var req ChangePasswordRequest
 
-	userIDString, exists := c.Get("userID")
+	userIDString, exists := middleware.RequireUserID(c)
 	if !exists {
-		httphelpers.RespondUnauthorized(c, "Authentication context missing")
 		return
 	}
 
-	userID, err := uuid.Parse(userIDString.(string))
+	userID, err := uuid.Parse(userIDString)
 	if err != nil {
 		httphelpers.RespondParamError(c, "user_id", "Invalid user id in token")
 		return
@@ -113,9 +112,8 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 
-	tokenString, exists := c.Get(middleware.RawTokenKey)
-	if !exists || tokenString == "" {
-		httphelpers.RespondUnauthorized(c, "Token não encontrado no contexto.")
+	token, exists := middleware.RequireRawToken(c)
+	if !exists {
 		return
 	}
 
@@ -124,7 +122,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		userID,
 		req.CurrentPassword,
 		req.NewPassword,
-		tokenString.(string),
+		token,
 	)
 
 	if err != nil {
@@ -152,13 +150,12 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 // @Failure 401 {object} response.Standard
 // @Router /auth/logout [post]
 func (h *Handler) Logout(c *gin.Context) {
-	tokenString, exists := c.Get(middleware.RawTokenKey)
-	if !exists || tokenString == "" {
-		httphelpers.RespondUnauthorized(c, "Token não encontrado no contexto.")
+	token, exists := middleware.RequireRawToken(c)
+	if !exists {
 		return
 	}
 
-	err := h.service.Logout(c.Request.Context(), tokenString.(string))
+	err := h.service.Logout(c.Request.Context(), token)
 
 	if err != nil {
 		httphelpers.RespondInternalError(c, err)
@@ -250,13 +247,12 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 func (h *Handler) DeactivateSelf(c *gin.Context) {
 	var req DeactivateRequest
 
-	userIDString, exists := c.Get("userID")
+	userIDString, exists := middleware.RequireUserID(c)
 	if !exists {
-		httphelpers.RespondUnauthorized(c, "Authentication context missing")
 		return
 	}
 
-	userID, err := uuid.Parse(userIDString.(string))
+	userID, err := uuid.Parse(userIDString)
 	if err != nil {
 		httphelpers.RespondParamError(c, "user_id", "Invalid user id in token")
 		return
@@ -267,9 +263,8 @@ func (h *Handler) DeactivateSelf(c *gin.Context) {
 		return
 	}
 
-	tokenString, exists := c.Get(middleware.RawTokenKey)
-	if !exists || tokenString == "" {
-		httphelpers.RespondUnauthorized(c, "Token não encontrado no contexto.")
+	token, exists := middleware.RequireRawToken(c)
+	if !exists {
 		return
 	}
 
@@ -277,7 +272,7 @@ func (h *Handler) DeactivateSelf(c *gin.Context) {
 		c.Request.Context(),
 		userID,
 		req.CurrentPassword,
-		tokenString.(string),
+		token,
 	)
 
 	if err != nil {
@@ -311,7 +306,7 @@ func (h *Handler) UpdateUserStatus(c *gin.Context) {
 	requesterRole, _ := c.Get("role")
 	targetUserID := c.Param("id")
 
-	if requesterRole != "admin" {
+	if user.Role(requesterRole.(string)) != user.RoleAdmin {
 		httphelpers.RespondUnauthorized(c, "Acesso negado. Apenas administradores podem alterar o status de outros usuários.")
 		return
 	}
@@ -327,7 +322,7 @@ func (h *Handler) UpdateUserStatus(c *gin.Context) {
 		return
 	}
 
-	err = h.service.UpdateUserStatus(c.Request.Context(), userID, req.NewStatus)
+	err = h.service.UpdateUserStatus(c.Request.Context(), userID, user.Status(req.NewStatus))
 
 	if err != nil {
 		httphelpers.RespondInternalError(c, err)

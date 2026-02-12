@@ -18,11 +18,17 @@ FROM alpine:latest
 
 RUN apk --no-cache add ca-certificates
 
-WORKDIR /root/
+# Create a non-privileged user and group
+RUN addgroup -S chameleon && adduser -S chameleon -G chameleon
 
-COPY --from=builder /app/chameleon-auth-api .
+WORKDIR /app
 
-COPY --from=builder /app/docs ./docs
+# Copy the binary and docs from the builder, ensuring ownership
+COPY --from=builder --chown=chameleon:chameleon /app/chameleon-auth-api .
+COPY --from=builder --chown=chameleon:chameleon /app/docs ./docs
+
+# Use the non-privileged user
+USER chameleon
 
 EXPOSE 8081
 

@@ -1,6 +1,8 @@
 package app
 
 import (
+	"log"
+
 	_ "github.com/felipedenardo/chameleon-auth-api/docs"
 	authhandler "github.com/felipedenardo/chameleon-auth-api/internal/api/handler/auth"
 	"github.com/felipedenardo/chameleon-auth-api/internal/config"
@@ -19,6 +21,7 @@ import (
 type HandlerContainer struct {
 	AuthHandler *authhandler.Handler
 	RedisClient *redis.Client
+	DB          *gorm.DB
 	UserRepo    user.IRepository
 }
 
@@ -27,13 +30,28 @@ func NewHandlerContainer(db *gorm.DB, cfg *config.Config, redisClient *redis.Cli
 	return &HandlerContainer{
 		AuthHandler: newAuthHandler(cfg, redisClient, userRepo),
 		RedisClient: redisClient,
+		DB:          db,
 		UserRepo:    userRepo,
+	}
+}
+
+func (hc *HandlerContainer) Close() {
+	if hc.DB != nil {
+		sqlDB, err := hc.DB.DB()
+		if err == nil {
+			log.Println("[INFO] Closing PostgreSQL connection...")
+			_ = sqlDB.Close()
+		}
+	}
+	if hc.RedisClient != nil {
+		log.Println("[INFO] Closing Redis connection...")
+		_ = hc.RedisClient.Close()
 	}
 }
 
 func newAuthHandler(cfg *config.Config, redisClient *redis.Client, userRepo user.IRepository) *authhandler.Handler {
 	cacheRepo := redisrepository.NewCacheRepository(redisClient)
-	authService := authdomain.NewAuthService(userRepo, cacheRepo, cfg.JWTSecret)
+	authService := authdomain.NewAuthService(userRepo, cacheRepo, cfg)
 	return authhandler.NewAuthHandler(authService)
 }
 

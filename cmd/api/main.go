@@ -3,6 +3,15 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"reflect"
+	"strings"
+	"syscall"
+	"time"
+
 	"github.com/felipedenardo/chameleon-auth-api/internal/app"
 	"github.com/felipedenardo/chameleon-auth-api/internal/config"
 	"github.com/felipedenardo/chameleon-auth-api/internal/infra/database/postgresql/migration"
@@ -14,9 +23,6 @@ import (
 	"github.com/redis/go-redis/v9"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
-	"log"
-	"reflect"
-	"strings"
 )
 
 // @title Auth API Microservice (Chameleon System)
@@ -46,16 +52,39 @@ func main() {
 	handlers := app.NewHandlerContainer(db, cfg, redisClient)
 	r := app.SetupRouter(handlers, cfg)
 
-	log.Printf("[INFO] Auth API running on port %s", cfg.Port)
-	if err := r.Run(":" + cfg.Port); err != nil {
-		log.Fatalf("[FATAL] Server failed: %v", err)
+	srv := &http.Server{
+		Addr:    ":" + cfg.Port,
+		Handler: r,
 	}
+
+	go func() {
+		log.Printf("[INFO] Auth API running on port %s", cfg.Port)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("[FATAL] Server failed: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown the server with a timeout of 5 seconds.
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	log.Println("[INFO] Shutting down server...")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatalf("[FATAL] Server forced to shutdown: %v", err)
+	}
+
+	handlers.Close()
+	log.Println("[INFO] Server exiting correctly")
 }
 
 func setupPostgres(cfg *config.Config) *gorm.DB {
 	dsn := fmt.Sprintf(
-		"host=%s user=%s password=%s dbname=%s port=%s sslmode=disable TimeZone=UTC",
-		cfg.DBHost, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBPort,
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s TimeZone=UTC",
+		cfg.DBHost, cfg.DBUser, cfg.DBPassword, cfg.DBName, cfg.DBPort, cfg.DBSSLMode,
 	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
