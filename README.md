@@ -11,11 +11,12 @@ O serviço utiliza a biblioteca [chameleon-common](https://github.com/felipedena
 Este projeto foi desenvolvido com foco em performance, segurança e manutenibilidade:
 
 - **Linguagem:** Go 1.24.3
-- **Framework Web:** [Gin Gonic](https://github.com/gin-gonic/gin)
+- **API Framework:** [Gin Gonic](https://github.com/gin-gonic/gin)
 - **ORM:** [GORM](https://gorm.io/) com PostgreSQL
 - **Cache & Sessão:** [Redis](https://redis.io/) (Blacklist de tokens e controle de versão)
 - **Documentação:** [Swagger/OpenAPI](https://github.com/swaggo/swag)
-- **Arquitetura:** Baseada em **Hexagonal / Clean Architecture**, separando claramente as regras de negócio da infraestrutura.
+- **Segurança Infra:** Docker Non-Root execution (usuário dedicado)
+- **Arquitetura:** Baseada em **Hexagonal / Clean Architecture**, com Strongly Typed Domain (Types/Constants), Graceful Shutdown e Error Mapping de infraestrutura para domínio.
 
 ---
 
@@ -30,6 +31,9 @@ Este projeto foi desenvolvido com foco em performance, segurança e manutenibili
     - Soft Delete para usuários desativados.
 - [x] **Recuperação de Senha:** Fluxo completo de "Esqueci minha senha" com tokens de reset.
 - [x] **Controle Administrativo:** Endpoint para alteração de status de usuários (Ativo, Suspenso, Banido).
+- [x] **Resiliência e Ciclo de Vida:**
+    - Suporte a **Graceful Shutdown** (SIGINT/SIGTERM).
+    - Fechamento limpo de conexões Postgres e Redis.
 
 ---
 
