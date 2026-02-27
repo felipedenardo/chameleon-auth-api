@@ -1,11 +1,19 @@
 package auth
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
+	"regexp"
+	"strings"
+	"time"
 
+	"github.com/felipedenardo/chameleon-auth-api/internal/config"
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/auth"
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
+	"github.com/felipedenardo/chameleon-auth-api/internal/infra/ratelimit"
 	httphelpers "github.com/felipedenardo/chameleon-common/pkg/http"
 	"github.com/felipedenardo/chameleon-common/pkg/middleware"
 	"github.com/felipedenardo/chameleon-common/pkg/validation"
@@ -14,11 +22,23 @@ import (
 )
 
 type Handler struct {
-	service user.IService
+	service  user.IService
+	cfg      *config.Config
+	limiter  *ratelimit.Limiter
+	pwUpper  *regexp.Regexp
+	pwLower  *regexp.Regexp
+	pwSymbol *regexp.Regexp
 }
 
-func NewAuthHandler(s user.IService) *Handler {
-	return &Handler{service: s}
+func NewAuthHandler(s user.IService, cfg *config.Config, limiter *ratelimit.Limiter) *Handler {
+	return &Handler{
+		service:  s,
+		cfg:      cfg,
+		limiter:  limiter,
+		pwUpper:  regexp.MustCompile(`[A-Z]`),
+		pwLower:  regexp.MustCompile(`[a-z]`),
+		pwSymbol: regexp.MustCompile(`[^A-Za-z0-9]`),
+	}
 }
 
 // Register godoc
@@ -39,10 +59,15 @@ func (h *Handler) Register(c *gin.Context) {
 		return
 	}
 
-	userDomain, err := h.service.Register(c.Request.Context(), req.Name, req.Email, req.Password, user.Role(req.Role))
+	if !h.isStrongPassword(req.Password) {
+		httphelpers.RespondDomainFail(c, "Senha deve ter no mínimo 8 caracteres, 1 maiúscula, 1 minúscula e 1 especial.")
+		return
+	}
+
+	userDomain, err := h.service.Register(c.Request.Context(), req.Name, req.Email, req.Password)
 	if err != nil {
 		if errors.Is(err, auth.ErrEmailAlreadyExists) {
-			httphelpers.RespondDomainFail(c, err.Error())
+			httphelpers.RespondDomainFail(c, "Não foi possível concluir o cadastro.")
 			return
 		}
 		httphelpers.RespondInternalError(c, err)
@@ -70,15 +95,20 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 
-	token, userDomain, err := h.service.Login(c.Request.Context(), req.Email, req.Password)
+	if err := h.checkRateLimit(c, "login", req.Email, h.cfg.LoginRateLimit, h.cfg.LoginRateWindowSec); err != nil {
+		return
+	}
+
+	token, refreshToken, userDomain, err := h.service.Login(c.Request.Context(), req.Email, req.Password)
 	if err != nil {
-		httphelpers.RespondUnauthorized(c, err.Error())
+		httphelpers.RespondUnauthorized(c, "Credenciais inválidas.")
 		return
 	}
 
 	responseDTO := LoginResponse{
-		Token: token,
-		User:  ToUserResponse(userDomain),
+		Token:        token,
+		RefreshToken: refreshToken,
+		User:         ToUserResponse(userDomain),
 	}
 
 	httphelpers.RespondOK(c, responseDTO)
@@ -112,6 +142,11 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 		return
 	}
 
+	if !h.isStrongPassword(req.NewPassword) {
+		httphelpers.RespondDomainFail(c, "Senha deve ter no mínimo 8 caracteres, 1 maiúscula, 1 minúscula e 1 especial.")
+		return
+	}
+
 	token, exists := middleware.RequireRawToken(c)
 	if !exists {
 		return
@@ -128,7 +163,7 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCurrentPassword) ||
 			errors.Is(err, auth.ErrSamePassword) {
-			httphelpers.RespondDomainFail(c, err.Error())
+			httphelpers.RespondDomainFail(c, "Não foi possível alterar a senha.")
 			return
 		}
 		httphelpers.RespondInternalError(c, err)
@@ -145,24 +180,73 @@ func (h *Handler) ChangePassword(c *gin.Context) {
 // @Accept json
 // @Produce json
 // @Security ApiKeyAuth
+// @Param request body LogoutRequest true "Refresh token"
 // @Success 200 {object} response.Standard
 // @Failure 400 {object} response.Standard
 // @Failure 401 {object} response.Standard
 // @Router /auth/logout [post]
 func (h *Handler) Logout(c *gin.Context) {
+	var req LogoutRequest
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httphelpers.RespondBindingError(c, err)
+		return
+	}
+
 	token, exists := middleware.RequireRawToken(c)
 	if !exists {
 		return
 	}
 
-	err := h.service.Logout(c.Request.Context(), token)
+	err := h.service.Logout(c.Request.Context(), token, req.RefreshToken)
 
 	if err != nil {
+		if errors.Is(err, auth.ErrInvalidRefreshToken) {
+			httphelpers.RespondUnauthorized(c, "Sessão inválida.")
+			return
+		}
 		httphelpers.RespondInternalError(c, err)
 		return
 	}
 
 	httphelpers.RespondOK(c, gin.H{"message": "Sessão encerrada com sucesso."})
+}
+
+// LogoutAll revoga todas as sessões do usuário atual.
+// @Summary Revogar todas as sessões
+// @Description Incrementa a versão do token, invalidando todos os tokens do usuário.
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Security ApiKeyAuth
+// @Success 200 {object} response.Standard
+// @Failure 400 {object} response.Standard
+// @Failure 401 {object} response.Standard
+// @Router /auth/logout-all [post]
+func (h *Handler) LogoutAll(c *gin.Context) {
+	userIDString, exists := middleware.RequireUserID(c)
+	if !exists {
+		return
+	}
+
+	userID, err := uuid.Parse(userIDString)
+	if err != nil {
+		httphelpers.RespondParamError(c, "user_id", "Invalid user id in token")
+		return
+	}
+
+	token, exists := middleware.RequireRawToken(c)
+	if !exists {
+		return
+	}
+
+	err = h.service.LogoutAll(c.Request.Context(), userID, token)
+	if err != nil {
+		httphelpers.RespondInternalError(c, err)
+		return
+	}
+
+	httphelpers.RespondOK(c, gin.H{"message": "Todas as sessões foram encerradas com sucesso."})
 }
 
 // ForgotPassword godoc
@@ -184,15 +268,28 @@ func (h *Handler) ForgotPassword(c *gin.Context) {
 		return
 	}
 
+	if err := h.checkRateLimit(c, "forgot", req.Email, h.cfg.ForgotRateLimit, h.cfg.ForgotRateWindowSec); err != nil {
+		return
+	}
+
 	if errs := validation.ValidateRequest(req); errs != nil {
 		httphelpers.RespondValidation(c, errs)
 		return
 	}
 
-	err := h.service.ForgotPassword(c.Request.Context(), req.Email)
+	token, err := h.service.ForgotPassword(c.Request.Context(), req.Email)
 
 	if err != nil {
 		httphelpers.RespondInternalError(c, err)
+		return
+	}
+
+	// DEV helper: return reset token in response for local testing only.
+	if h.cfg.ExposeResetToken && token != "" {
+		httphelpers.RespondOK(c, gin.H{
+			"message":     "Se o usuário existir, um link de reset foi enviado.",
+			"reset_token": token,
+		})
 		return
 	}
 
@@ -222,14 +319,60 @@ func (h *Handler) ResetPassword(c *gin.Context) {
 		return
 	}
 
+	if !h.isStrongPassword(req.NewPassword) {
+		httphelpers.RespondDomainFail(c, "Senha deve ter no mínimo 8 caracteres, 1 maiúscula, 1 minúscula e 1 especial.")
+		return
+	}
+
 	err := h.service.ResetPassword(c.Request.Context(), req.Token, req.NewPassword)
 
 	if err != nil {
-		httphelpers.RespondDomainFail(c, err.Error())
+		httphelpers.RespondDomainFail(c, "Não foi possível redefinir a senha.")
 		return
 	}
 
 	httphelpers.RespondOK(c, gin.H{"message": "Senha alterada com sucesso."})
+}
+
+// RefreshToken godoc
+// @Summary Renovar tokens
+// @Tags Auth
+// @Accept json
+// @Produce json
+// @Param request body RefreshTokenRequest true "Refresh token"
+// @Success 200 {object} response.Standard{data=LoginResponse}
+// @Failure 401 {object} response.Standard
+// @Failure 500 {object} response.Standard
+// @Router /auth/refresh [post]
+func (h *Handler) RefreshToken(c *gin.Context) {
+	var req RefreshTokenRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		httphelpers.RespondBindingError(c, err)
+		return
+	}
+
+	if req.RefreshToken == "" {
+		httphelpers.RespondBindingError(c, errors.New("refresh_token is required"))
+		return
+	}
+
+	if err := h.checkRateLimitKey(c, "refresh", req.RefreshToken, h.cfg.RefreshRateLimit, h.cfg.RefreshRateWindowSec); err != nil {
+		return
+	}
+
+	accessToken, refreshToken, userDomain, err := h.service.Refresh(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		httphelpers.RespondUnauthorized(c, err.Error())
+		return
+	}
+
+	responseDTO := LoginResponse{
+		Token:        accessToken,
+		RefreshToken: refreshToken,
+		User:         ToUserResponse(userDomain),
+	}
+
+	httphelpers.RespondOK(c, responseDTO)
 }
 
 // DeactivateSelf godoc
@@ -277,7 +420,7 @@ func (h *Handler) DeactivateSelf(c *gin.Context) {
 
 	if err != nil {
 		if errors.Is(err, auth.ErrInvalidCurrentPassword) {
-			httphelpers.RespondDomainFail(c, err.Error())
+			httphelpers.RespondDomainFail(c, "Não foi possível desativar a conta.")
 			return
 		}
 		httphelpers.RespondInternalError(c, err)
@@ -307,7 +450,7 @@ func (h *Handler) UpdateUserStatus(c *gin.Context) {
 	targetUserID := c.Param("id")
 
 	if user.Role(requesterRole.(string)) != user.RoleAdmin {
-		httphelpers.RespondUnauthorized(c, "Acesso negado. Apenas administradores podem alterar o status de outros usuários.")
+		httphelpers.RespondUnauthorized(c, "Acesso negado.")
 		return
 	}
 
@@ -330,4 +473,66 @@ func (h *Handler) UpdateUserStatus(c *gin.Context) {
 	}
 
 	httphelpers.RespondOK(c, gin.H{"message": fmt.Sprintf("Status do usuário %s alterado para %s.", targetUserID, req.NewStatus)})
+}
+
+func (h *Handler) checkRateLimit(c *gin.Context, action string, email string, limit int, windowSec int) error {
+	if h.limiter == nil || limit <= 0 || windowSec <= 0 {
+		return nil
+	}
+
+	ip := c.ClientIP()
+	emailKey := strings.ToLower(strings.TrimSpace(email))
+	key := fmt.Sprintf("rl:%s:ip:%s:email:%s", action, ip, emailKey)
+
+	allowed, err := h.limiter.Allow(c.Request.Context(), key, limit, time.Duration(windowSec)*time.Second)
+	if err != nil {
+		httphelpers.RespondInternalError(c, err)
+		return err
+	}
+	if !allowed {
+		c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"message": "Muitas tentativas. Tente novamente mais tarde."})
+		return errors.New("rate limit exceeded")
+	}
+	return nil
+}
+
+func (h *Handler) checkRateLimitKey(c *gin.Context, action string, rawKey string, limit int, windowSec int) error {
+	if h.limiter == nil || limit <= 0 || windowSec <= 0 {
+		return nil
+	}
+
+	ip := c.ClientIP()
+	key := fmt.Sprintf("rl:%s:ip:%s:key:%s", action, ip, hashKey(rawKey))
+
+	allowed, err := h.limiter.Allow(c.Request.Context(), key, limit, time.Duration(windowSec)*time.Second)
+	if err != nil {
+		httphelpers.RespondInternalError(c, err)
+		return err
+	}
+	if !allowed {
+		c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"message": "Muitas tentativas. Tente novamente mais tarde."})
+		return errors.New("rate limit exceeded")
+	}
+	return nil
+}
+
+func (h *Handler) isStrongPassword(pw string) bool {
+	if len(pw) < 8 {
+		return false
+	}
+	if !h.pwUpper.MatchString(pw) {
+		return false
+	}
+	if !h.pwLower.MatchString(pw) {
+		return false
+	}
+	if !h.pwSymbol.MatchString(pw) {
+		return false
+	}
+	return true
+}
+
+func hashKey(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
 }

@@ -2,6 +2,7 @@ package app
 
 import (
 	"log"
+	"net/http"
 
 	_ "github.com/felipedenardo/chameleon-auth-api/docs"
 	authhandler "github.com/felipedenardo/chameleon-auth-api/internal/api/handler/auth"
@@ -10,6 +11,7 @@ import (
 	"github.com/felipedenardo/chameleon-auth-api/internal/domain/user"
 	"github.com/felipedenardo/chameleon-auth-api/internal/infra/database/postgresql/repository"
 	redisrepository "github.com/felipedenardo/chameleon-auth-api/internal/infra/database/redis"
+	"github.com/felipedenardo/chameleon-auth-api/internal/infra/ratelimit"
 	"github.com/felipedenardo/chameleon-common/pkg/middleware"
 	"github.com/gin-gonic/gin"
 	"github.com/redis/go-redis/v9"
@@ -27,8 +29,9 @@ type HandlerContainer struct {
 
 func NewHandlerContainer(db *gorm.DB, cfg *config.Config, redisClient *redis.Client) *HandlerContainer {
 	userRepo := repository.NewUserRepository(db)
+	limiter := ratelimit.New(redisClient)
 	return &HandlerContainer{
-		AuthHandler: newAuthHandler(cfg, redisClient, userRepo),
+		AuthHandler: newAuthHandler(cfg, redisClient, userRepo, limiter),
 		RedisClient: redisClient,
 		DB:          db,
 		UserRepo:    userRepo,
@@ -49,14 +52,22 @@ func (hc *HandlerContainer) Close() {
 	}
 }
 
-func newAuthHandler(cfg *config.Config, redisClient *redis.Client, userRepo user.IRepository) *authhandler.Handler {
+func newAuthHandler(cfg *config.Config, redisClient *redis.Client, userRepo user.IRepository, limiter *ratelimit.Limiter) *authhandler.Handler {
 	cacheRepo := redisrepository.NewCacheRepository(redisClient)
 	authService := authdomain.NewAuthService(userRepo, cacheRepo, cfg)
-	return authhandler.NewAuthHandler(authService)
+	return authhandler.NewAuthHandler(authService, cfg, limiter)
 }
 
 func SetupRouter(handlers *HandlerContainer, cfg *config.Config) *gin.Engine {
 	r := gin.Default()
+
+	r.Use(func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, cfg.MaxBodyBytes)
+		c.Header("X-Content-Type-Options", "nosniff")
+		c.Header("X-Frame-Options", "DENY")
+		c.Header("Referrer-Policy", "no-referrer")
+		c.Next()
+	})
 
 	cacheRepo := redisrepository.NewCacheRepository(handlers.RedisClient)
 	tokenManager := redisrepository.NewTokenVersionManager(cacheRepo, handlers.UserRepo)
@@ -71,6 +82,7 @@ func SetupRouter(handlers *HandlerContainer, cfg *config.Config) *gin.Engine {
 			{
 				public.POST("/register", handlers.AuthHandler.Register)
 				public.POST("/login", handlers.AuthHandler.Login)
+				public.POST("/refresh", handlers.AuthHandler.RefreshToken)
 				public.POST("/forgot-password", handlers.AuthHandler.ForgotPassword)
 				public.POST("/reset-password", handlers.AuthHandler.ResetPassword)
 			}
@@ -81,6 +93,7 @@ func SetupRouter(handlers *HandlerContainer, cfg *config.Config) *gin.Engine {
 			{
 				protected.POST("/change-password", handlers.AuthHandler.ChangePassword)
 				protected.POST("/logout", handlers.AuthHandler.Logout)
+				protected.POST("/logout-all", handlers.AuthHandler.LogoutAll)
 				protected.POST("/deactivate", handlers.AuthHandler.DeactivateSelf)
 			}
 

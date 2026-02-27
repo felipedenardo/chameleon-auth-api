@@ -17,7 +17,7 @@ func NewTokenVersionManager(c auth.ICacheRepository, r user.IRepository) *TokenV
 }
 
 func (m *TokenVersionManager) GetUserTokenVersion(ctx context.Context, userID string) (int, error) {
-	key := "user:version:" + userID
+	key := userID
 
 	version, err := m.cache.GetUserTokenVersion(ctx, key)
 	if err == nil {

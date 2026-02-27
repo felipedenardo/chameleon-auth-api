@@ -22,15 +22,17 @@ Este projeto foi desenvolvido com foco em performance, segurança e manutenibili
 
 ## ✨ Funcionalidades Principais
 
-- [x] **Registro de Usuários:** Cadastro com diferentes papéis (Admin, User).
-- [x] **Autenticação JWT:** Emissão de tokens seguros com expiração configurável.
+- [x] **Registro de Usuários:** Cadastro público com papel padrão `user`.
+- [x] **Autenticação JWT:** Emissão de `access` e `refresh` tokens com expiração configurável.
 - [x] **Gestão de Sessão (Token Versioning):** Capacidade de invalidar todas as sessões de um usuário instantaneamente (ex: após troca de senha ou banimento).
 - [x] **Segurança Avançada:**
     - Blacklist de tokens no Logout.
     - Hash de senhas usando `bcrypt`.
     - Soft Delete para usuários desativados.
+- [x] **Validação de Senhas:** Mínimo de 8 caracteres com maiúscula, minúscula e especial.
+- [x] **Rate Limit:** Proteção contra abuso em login, refresh e recuperação de senha.
 - [x] **Recuperação de Senha:** Fluxo completo de "Esqueci minha senha" com tokens de reset.
-- [x] **Controle Administrativo:** Endpoint para alteração de status de usuários (Ativo, Suspenso, Banido).
+- [x] **Controle Administrativo:** Endpoint para alteração de status de usuários (Ativo, Inativo).
 - [x] **Resiliência e Ciclo de Vida:**
     - Suporte a **Graceful Shutdown** (SIGINT/SIGTERM).
     - Fechamento limpo de conexões Postgres e Redis.
@@ -71,12 +73,35 @@ A documentação interativa (Swagger) está disponível em:
 | :--- | :--- | :---: | :--- |
 | `POST` | `/api/v1/auth/register` | ❌ | Cadastro de novo usuário |
 | `POST` | `/api/v1/auth/login` | ❌ | Autenticação e obtenção de token |
-| `POST` | `/api/v1/auth/logout` | ✅ | Encerramento de sessão (Blacklist) |
+| `POST` | `/api/v1/auth/refresh` | ❌ | Renovação de tokens |
+| `POST` | `/api/v1/auth/logout` | ✅ | Encerramento de sessão (Blacklist + revogação do refresh) |
+| `POST` | `/api/v1/auth/logout-all` | ✅ | Encerramento de todas as sessões (token_version) |
 | `POST` | `/api/v1/auth/change-password` | ✅ | Alteração de senha do usuário logado |
 | `POST` | `/api/v1/auth/forgot-password` | ❌ | Solicitação de reset de senha |
 | `POST` | `/api/v1/auth/reset-password` | ❌ | Finalização do reset de senha |
 | `POST` | `/api/v1/auth/deactivate` | ✅ | Desativação da própria conta |
 | `PUT` | `/api/v1/admin/users/:id/status`| ✅ | (Admin) Alterar status de usuário |
+
+### Variáveis de Ambiente Relevantes
+
+```
+JWT_SECRET=coloque-uma-chave-segura-com-32-caracteres-ou-mais
+JWT_ISSUER=chameleon-auth-api
+JWT_AUDIENCE=chameleon-services
+
+TOKEN_TTL_HOURS=24
+REFRESH_TOKEN_TTL_DAYS=30
+RESET_TOKEN_TTL_MINUTES=30
+
+MAX_BODY_BYTES=1048576
+
+LOGIN_RATE_LIMIT=10
+LOGIN_RATE_WINDOW_SEC=60
+REFRESH_RATE_LIMIT=30
+REFRESH_RATE_WINDOW_SEC=60
+FORGOT_RATE_LIMIT=5
+FORGOT_RATE_WINDOW_SEC=300
+```
 
 ---
 

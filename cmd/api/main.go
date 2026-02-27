@@ -53,8 +53,12 @@ func main() {
 	r := app.SetupRouter(handlers, cfg)
 
 	srv := &http.Server{
-		Addr:    ":" + cfg.Port,
-		Handler: r,
+		Addr:              ":" + cfg.Port,
+		Handler:           r,
+		ReadHeaderTimeout: 10 * time.Second,
+		ReadTimeout:       30 * time.Second,
+		WriteTimeout:      30 * time.Second,
+		IdleTimeout:       60 * time.Second,
 	}
 
 	go func() {
@@ -91,10 +95,27 @@ func setupPostgres(cfg *config.Config) *gorm.DB {
 	if err != nil {
 		log.Fatalf("[FATAL] Failed to connect to PostgreSQL: %v", err)
 	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatalf("[FATAL] Failed to get PostgreSQL connection: %v", err)
+	}
+
+	sqlDB.SetMaxOpenConns(cfg.DBMaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.DBMaxIdleConns)
+	sqlDB.SetConnMaxLifetime(time.Duration(cfg.DBConnMaxLifetimeMin) * time.Minute)
+	sqlDB.SetConnMaxIdleTime(time.Duration(cfg.DBConnMaxIdleMin) * time.Minute)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := sqlDB.PingContext(ctx); err != nil {
+		log.Fatalf("[FATAL] Failed to ping PostgreSQL: %v", err)
+	}
 	log.Println("PostgreSQL connection established")
 
 	m := gormigrate.New(db, gormigrate.DefaultOptions, []*gormigrate.Migration{
 		&migration.ID011220251300DDLCreateInitialSchema,
+		&migration.ID270220261200DDLNormalizeEmailCitext,
 	})
 
 	if err = m.Migrate(); err != nil {
@@ -109,12 +130,17 @@ func setupRedis(cfg *config.Config) *redis.Client {
 	redisAddr := fmt.Sprintf("%s:%s", cfg.RedisHost, cfg.RedisPort)
 
 	redisClient := redis.NewClient(&redis.Options{
-		Addr:     redisAddr,
-		Password: cfg.RedisPassword,
-		DB:       cfg.RedisDB,
+		Addr:         redisAddr,
+		Password:     cfg.RedisPassword,
+		DB:           cfg.RedisDB,
+		DialTimeout:  time.Duration(cfg.RedisDialTimeoutMs) * time.Millisecond,
+		ReadTimeout:  time.Duration(cfg.RedisReadTimeoutMs) * time.Millisecond,
+		WriteTimeout: time.Duration(cfg.RedisWriteTimeoutMs) * time.Millisecond,
 	})
 
-	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	if _, err := redisClient.Ping(ctx).Result(); err != nil {
 		log.Fatalf("[FATAL] Failed to connect to Redis: %v", err)
 	}
 	log.Println("Redis connection established")

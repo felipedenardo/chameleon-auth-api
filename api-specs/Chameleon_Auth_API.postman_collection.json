@@ -1,300 +1,396 @@
 {
   "info": {
     "_postman_id": "97e682d2-8f2e-4b6e-a22a-f8f41199a5c4",
-    "name": "Chameleon Auth API - Testes Iniciais",
+    "name": "Chameleon Auth API - Testes",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
     {
-      "name": "1. Health Check (200 OK)",
-      "request": {
-        "method": "GET",
-        "header": [],
-        "url": {
-          "raw": "{{base_url}}/api/v1/health",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "health"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "2. Register User (POST /register)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"name\": \"Test User\",\n    \"email\": \"test.user@chameleon.com\",\n    \"password\": \"SenhaSegura!123\",\n    \"role\": \"professional\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/register",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "register"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "3. Login User (POST /login) & Get Token",
-      "event": [
+      "name": "Health",
+      "item": [
         {
-          "listen": "test",
-          "script": {
-            "exec": [
-              "// Salva o token JWT na variável de ambiente 'auth_token'",
-              "var jsonData = pm.response.json();",
-              "if (pm.response.code === 200 && jsonData.data && jsonData.data.token) {",
-              "    pm.environment.set(\"auth_token\", jsonData.data.token);",
-              "    console.log(\"Token salvo: \" + jsonData.data.token);",
-              "}"
+          "name": "Health Check (200 OK)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/api/v1/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health"
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register User (POST /register)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
             ],
-            "type": "text/javascript"
-          }
-        }
-      ],
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"email\": \"test.user@chameleon.com\",\n    \"password\": \"SenhaSegura!123\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/login",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "login"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "4. Change Password (Protected Route)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Test User\",\n    \"email\": \"test.user@chameleon.com\",\n    \"password\": \"Senha@123\",\n    \"confirm_password\": \"Senha@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "register"
+              ]
+            }
           },
-          {
-            "key": "Authorization",
-            "value": "Bearer {{auth_token}}"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"current_password\": \"SenhaSegura!123\",\n    \"new_password\": \"NovaSenha!456\",\n    \"confirm_password\": \"NovaSenha!456\"\n}"
+          "response": []
         },
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/change-password",
-          "host": [
-            "{{base_url}}"
+        {
+          "name": "Login User (POST /login) & Get Tokens",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (pm.response.code === 200 && jsonData.data) {",
+                  "  if (jsonData.data.token) {",
+                  "    pm.environment.set(\"auth_token\", jsonData.data.token);",
+                  "  }",
+                  "  if (jsonData.data.refresh_token) {",
+                  "    pm.environment.set(\"refresh_token\", jsonData.data.refresh_token);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
           ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "change-password"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "5. Logout (POST /logout)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"test.user@chameleon.com\",\n    \"password\": \"Senha@123\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "login"
+              ]
+            }
           },
-          {
-            "key": "Authorization",
-            "value": "Bearer {{auth_token}}"
-          }
-        ],
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/logout",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "logout"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "6. Forgot Password (Inicia Reset)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"email\": \"teste.user@chameleon.com\"\n}"
+          "response": []
         },
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/forgot-password",
-          "host": [
-            "{{base_url}}"
+        {
+          "name": "Refresh Tokens (POST /refresh)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (pm.response.code === 200 && jsonData.data) {",
+                  "  if (jsonData.data.token) {",
+                  "    pm.environment.set(\"auth_token\", jsonData.data.token);",
+                  "  }",
+                  "  if (jsonData.data.refresh_token) {",
+                  "    pm.environment.set(\"refresh_token\", jsonData.data.refresh_token);",
+                  "  }",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
           ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "forgot-password"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "7. Reset Password (Finaliza Reset)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"token\": \"INSIRA_AQUI_O_UUID_GERADO_NO_LOG\",\n    \"new_password\": \"NovaSenha!456\",\n    \"confirm_password\": \"NovaSenha!456\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/reset-password",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "reset-password"
-          ]
-        }
-      },
-      "response": []
-    },
-    {
-      "name": "8. Deactivate Self (POST /deactivate)",
-      "request": {
-        "method": "POST",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "refresh"
+              ]
+            }
           },
-          {
-            "key": "Authorization",
-            "value": "Bearer {{auth_token}}"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"current_password\": \"NovaSenha!456\"\n}"
+          "response": []
         },
-        "url": {
-          "raw": "{{base_url}}/api/v1/auth/deactivate",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "auth",
-            "deactivate"
-          ]
+        {
+          "name": "Change Password (Protected Route)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"current_password\": \"Senha@123\",\n    \"new_password\": \"NovaSenha@456\",\n    \"confirm_new_password\": \"NovaSenha@456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/change-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "change-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout (POST /logout)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refresh_token\": \"{{refresh_token}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "logout"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Logout All (POST /logout-all)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/logout-all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "logout-all"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Forgot Password (Inicia Reset)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"test.user@chameleon.com\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/forgot-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "forgot-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reset Password (Finaliza Reset)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"token\": \"INSIRA_AQUI_O_TOKEN_RESET\",\n    \"new_password\": \"NovaSenha@456\",\n    \"confirm_password\": \"NovaSenha@456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/reset-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reset-password"
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate Self (POST /deactivate)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"current_password\": \"NovaSenha@456\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/deactivate",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "deactivate"
+              ]
+            }
+          },
+          "response": []
         }
-      },
-      "response": []
+      ]
     },
     {
-      "name": "9. Update User Status (PUT /admin/users/{id}/status)",
-      "request": {
-        "method": "PUT",
-        "header": [
-          {
-            "key": "Content-Type",
-            "value": "application/json"
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Update User Status (PUT /admin/users/{id}/status)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{auth_token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"active\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/admin/users/{{user_id}}/status",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "admin",
+                "users",
+                "{{user_id}}",
+                "status"
+              ]
+            }
           },
-          {
-            "key": "Authorization",
-            "value": "Bearer {{auth_token}}"
-          }
-        ],
-        "body": {
-          "mode": "raw",
-          "raw": "{\n    \"status\": \"active\"\n}"
-        },
-        "url": {
-          "raw": "{{base_url}}/api/v1/admin/users/{{user_id}}/status",
-          "host": [
-            "{{base_url}}"
-          ],
-          "path": [
-            "api",
-            "v1",
-            "admin",
-            "users",
-            "{{user_id}}",
-            "status"
-          ]
+          "response": []
         }
-      },
-      "response": []
+      ]
     }
   ],
   "variable": [
     {
       "key": "base_url",
-      "value": "http://localhost:8081",
+      "value": "http://localhost:8081/chameleon-auth",
       "type": "string"
     },
     {
       "key": "auth_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "refresh_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "user_id",
       "value": "",
       "type": "string"
     }

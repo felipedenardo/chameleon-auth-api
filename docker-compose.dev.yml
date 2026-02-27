@@ -25,6 +25,41 @@ services:
     networks:
       - microservices-net
 
+  auth_api:
+    build: .
+    container_name: chameleon_auth_api
+    ports:
+      - "8081:8081"
+    depends_on:
+      - auth_db
+      - redis_cache
+    environment:
+      - DB_HOST=auth
+      - DB_PORT=5432
+      - DB_USER=auth
+      - DB_PASSWORD=auth
+      - DB_NAME=auth
+      - REDIS_HOST=redis_cache
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=
+      - REDIS_DB=0
+      - JWT_SECRET=chameleon-api-secret-2026-CHANGE-ME-32CHARS
+      - JWT_ISSUER=chameleon-auth-api
+      - JWT_AUDIENCE=chameleon-services
+      - TOKEN_TTL_HOURS=24
+      - REFRESH_TOKEN_TTL_DAYS=30
+      - RESET_TOKEN_TTL_MINUTES=30
+      - MAX_BODY_BYTES=1048576
+      - LOGIN_RATE_LIMIT=10
+      - LOGIN_RATE_WINDOW_SEC=60
+      - REFRESH_RATE_LIMIT=30
+      - REFRESH_RATE_WINDOW_SEC=60
+      - FORGOT_RATE_LIMIT=5
+      - FORGOT_RATE_WINDOW_SEC=300
+      - SERVER_PORT=8081
+    networks:
+      - microservices-net
+
 volumes:
   auth_postgres_data:
 

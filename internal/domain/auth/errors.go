@@ -11,4 +11,5 @@ var (
 	ErrSamePassword           = errors.New("new password cannot be the same as the current password")
 	ErrInvalidResetToken      = errors.New("invalid or expired reset token")
 	ErrInvalidUserID          = errors.New("invalid user ID associated with token")
+	ErrInvalidRefreshToken    = errors.New("invalid or expired refresh token")
 )

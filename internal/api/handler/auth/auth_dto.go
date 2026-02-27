@@ -8,14 +8,17 @@ import (
 type RegisterRequest struct {
 	Name            string `json:"name" binding:"required,min=3,max=100"`
 	Email           string `json:"email" binding:"required,email"`
-	Password        string `json:"password" binding:"required,min=6"`
+	Password        string `json:"password" binding:"required,min=8" example:"Senha@123"`
 	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=Password"`
-	Role            string `json:"role" binding:"required,oneof=admin professional"`
 }
 
 type LoginRequest struct {
 	Email    string `json:"email" binding:"required,email"`
 	Password string `json:"password" binding:"required"`
+}
+
+type LogoutRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
 }
 
 type UserResponse struct {
@@ -27,8 +30,9 @@ type UserResponse struct {
 }
 
 type LoginResponse struct {
-	Token string       `json:"token"`
-	User  UserResponse `json:"user"`
+	Token        string       `json:"token"`
+	RefreshToken string       `json:"refresh_token"`
+	User         UserResponse `json:"user"`
 }
 
 func ToUserResponse(u *user.User) UserResponse {
@@ -43,7 +47,7 @@ func ToUserResponse(u *user.User) UserResponse {
 
 type ChangePasswordRequest struct {
 	CurrentPassword    string `json:"current_password" binding:"required"`
-	NewPassword        string `json:"new_password" binding:"required,min=8"`
+	NewPassword        string `json:"new_password" binding:"required,min=8" example:"Senha@123"`
 	ConfirmNewPassword string `json:"confirm_new_password" binding:"required,eqfield=NewPassword"`
 }
 
@@ -53,7 +57,7 @@ type ForgotPasswordRequest struct {
 
 type ResetPasswordRequest struct {
 	Token           string `json:"token" binding:"required"`
-	NewPassword     string `json:"new_password" binding:"required,min=8"`
+	NewPassword     string `json:"new_password" binding:"required,min=8" example:"Senha@123"`
 	ConfirmPassword string `json:"confirm_password" binding:"required,eqfield=NewPassword"`
 }
 
@@ -62,5 +66,9 @@ type DeactivateRequest struct {
 }
 
 type StatusUpdateRequest struct {
-	NewStatus string `json:"status" binding:"required,oneof=active inactive suspended"`
+	NewStatus string `json:"status" binding:"required,oneof=active inactive"`
+}
+
+type RefreshTokenRequest struct {
+	RefreshToken string `json:"refresh_token" binding:"required"`
 }

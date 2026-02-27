@@ -11,6 +11,8 @@ import (
 	"gorm.io/gorm"
 )
 
+const dbOpTimeout = 3 * time.Second
+
 type userRepository struct {
 	db *gorm.DB
 }
@@ -20,12 +22,16 @@ func NewUserRepository(db *gorm.DB) user.IRepository {
 }
 
 func (r *userRepository) Create(ctx context.Context, u *user.User) error {
-	return r.db.WithContext(ctx).Create(u).Error
+	opCtx, cancel := context.WithTimeout(ctx, dbOpTimeout)
+	defer cancel()
+	return r.db.WithContext(opCtx).Create(u).Error
 }
 
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (*user.User, error) {
 	var u user.User
-	if err := r.db.WithContext(ctx).Where("email = ?", email).First(&u).Error; err != nil {
+	opCtx, cancel := context.WithTimeout(ctx, dbOpTimeout)
+	defer cancel()
+	if err := r.db.WithContext(opCtx).Where("email = ?", email).First(&u).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, nil
 		}
@@ -36,19 +42,23 @@ func (r *userRepository) FindByEmail(ctx context.Context, email string) (*user.U
 
 func (r *userRepository) FindByID(ctx context.Context, id uuid.UUID) (*user.User, error) {
 	var u user.User
-	if err := r.db.WithContext(ctx).First(&u, "id = ?", id).Error; err != nil {
+	opCtx, cancel := context.WithTimeout(ctx, dbOpTimeout)
+	defer cancel()
+	if err := r.db.WithContext(opCtx).First(&u, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &u, nil
 }
 
 func (r *userRepository) UpdatePasswordHash(ctx context.Context, userID uuid.UUID, newHash string) error {
+	opCtx, cancel := context.WithTimeout(ctx, dbOpTimeout)
+	defer cancel()
 	updates := map[string]interface{}{
 		"password_hash": newHash,
 		"updated_at":    time.Now(),
 	}
 
-	result := r.db.WithContext(ctx).Model(&user.User{}).Where("id = ?", userID).Updates(updates)
+	result := r.db.WithContext(opCtx).Model(&user.User{}).Where("id = ?", userID).Updates(updates)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -62,7 +72,10 @@ func (r *userRepository) UpdatePasswordHash(ctx context.Context, userID uuid.UUI
 func (r *userRepository) UpdateLastLoginAt(ctx context.Context, userID uuid.UUID) error {
 	now := time.Now()
 
-	result := r.db.WithContext(ctx).
+	opCtx, cancel := context.WithTimeout(ctx, dbOpTimeout)
+	defer cancel()
+
+	result := r.db.WithContext(opCtx).
 		Model(&user.User{}).
 		Where("id = ?", userID).
 		Update("last_login_at", now)
@@ -74,7 +87,10 @@ func (r *userRepository) UpdateLastLoginAt(ctx context.Context, userID uuid.UUID
 }
 
 func (r *userRepository) UpdateStatus(ctx context.Context, userID uuid.UUID, status string) error {
-	result := r.db.WithContext(ctx).Model(&user.User{}).
+	opCtx, cancel := context.WithTimeout(ctx, dbOpTimeout)
+	defer cancel()
+
+	result := r.db.WithContext(opCtx).Model(&user.User{}).
 		Where("id = ?", userID).
 		Update("status", status)
 
@@ -88,7 +104,10 @@ func (r *userRepository) UpdateStatus(ctx context.Context, userID uuid.UUID, sta
 }
 
 func (r *userRepository) IncrementTokenVersion(ctx context.Context, userID uuid.UUID) error {
-	result := r.db.WithContext(ctx).Model(&user.User{}).
+	opCtx, cancel := context.WithTimeout(ctx, dbOpTimeout)
+	defer cancel()
+
+	result := r.db.WithContext(opCtx).Model(&user.User{}).
 		Where("id = ?", userID).
 		Update("token_version", gorm.Expr("token_version + ?", 1))
 
@@ -103,7 +122,10 @@ func (r *userRepository) IncrementTokenVersion(ctx context.Context, userID uuid.
 
 func (r *userRepository) GetUserTokenVersion(ctx context.Context, userID string) (int, error) {
 	var version int
-	result := r.db.WithContext(ctx).
+	opCtx, cancel := context.WithTimeout(ctx, dbOpTimeout)
+	defer cancel()
+
+	result := r.db.WithContext(opCtx).
 		Model(&user.User{}).
 		Select("token_version").
 		Where("id = ?", userID).

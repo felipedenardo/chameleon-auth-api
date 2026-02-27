@@ -1,34 +1,35 @@
 basePath: /api/v1
 definitions:
-  internal_api_handler_auth.ChangePasswordRequest:
+  auth.ChangePasswordRequest:
     properties:
-      confirm_password:
+      confirm_new_password:
         type: string
       current_password:
         type: string
       new_password:
+        example: Senha@123
         minLength: 8
         type: string
     required:
-    - confirm_password
+    - confirm_new_password
     - current_password
     - new_password
     type: object
-  internal_api_handler_auth.DeactivateRequest:
+  auth.DeactivateRequest:
     properties:
       current_password:
         type: string
     required:
     - current_password
     type: object
-  internal_api_handler_auth.ForgotPasswordRequest:
+  auth.ForgotPasswordRequest:
     properties:
       email:
         type: string
     required:
     - email
     type: object
-  internal_api_handler_auth.LoginRequest:
+  auth.LoginRequest:
     properties:
       email:
         type: string
@@ -38,15 +39,33 @@ definitions:
     - email
     - password
     type: object
-  internal_api_handler_auth.LoginResponse:
+  auth.LoginResponse:
     properties:
+      refresh_token:
+        type: string
       token:
         type: string
       user:
-        $ref: '#/definitions/internal_api_handler_auth.UserResponse'
+        $ref: '#/definitions/auth.UserResponse'
     type: object
-  internal_api_handler_auth.RegisterRequest:
+  auth.LogoutRequest:
     properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  auth.RefreshTokenRequest:
+    properties:
+      refresh_token:
+        type: string
+    required:
+    - refresh_token
+    type: object
+  auth.RegisterRequest:
+    properties:
+      confirm_password:
+        type: string
       email:
         type: string
       name:
@@ -54,24 +73,21 @@ definitions:
         minLength: 3
         type: string
       password:
-        minLength: 6
-        type: string
-      role:
-        enum:
-        - admin
-        - professional
+        example: Senha@123
+        minLength: 8
         type: string
     required:
+    - confirm_password
     - email
     - name
     - password
-    - role
     type: object
-  internal_api_handler_auth.ResetPasswordRequest:
+  auth.ResetPasswordRequest:
     properties:
       confirm_password:
         type: string
       new_password:
+        example: Senha@123
         minLength: 8
         type: string
       token:
@@ -81,18 +97,17 @@ definitions:
     - new_password
     - token
     type: object
-  internal_api_handler_auth.StatusUpdateRequest:
+  auth.StatusUpdateRequest:
     properties:
       status:
         enum:
         - active
         - inactive
-        - suspended
         type: string
     required:
     - status
     type: object
-  internal_api_handler_auth.UserResponse:
+  auth.UserResponse:
     properties:
       created_at:
         type: string
@@ -154,7 +169,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handler_auth.StatusUpdateRequest'
+          $ref: '#/definitions/auth.StatusUpdateRequest'
       produces:
       - application/json
       responses:
@@ -185,7 +200,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handler_auth.ChangePasswordRequest'
+          $ref: '#/definitions/auth.ChangePasswordRequest'
       produces:
       - application/json
       responses:
@@ -210,7 +225,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handler_auth.DeactivateRequest'
+          $ref: '#/definitions/auth.DeactivateRequest'
       produces:
       - application/json
       responses:
@@ -242,7 +257,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handler_auth.ForgotPasswordRequest'
+          $ref: '#/definitions/auth.ForgotPasswordRequest'
       produces:
       - application/json
       responses:
@@ -271,7 +286,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handler_auth.LoginRequest'
+          $ref: '#/definitions/auth.LoginRequest'
       produces:
       - application/json
       responses:
@@ -282,7 +297,7 @@ paths:
             - $ref: '#/definitions/response.Standard'
             - properties:
                 data:
-                  $ref: '#/definitions/internal_api_handler_auth.LoginResponse'
+                  $ref: '#/definitions/auth.LoginResponse'
               type: object
         "401":
           description: Unauthorized
@@ -300,6 +315,13 @@ paths:
       consumes:
       - application/json
       description: Adiciona o JWT à blacklist, invalidando a sessão imediatamente.
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.LogoutRequest'
       produces:
       - application/json
       responses:
@@ -320,6 +342,65 @@ paths:
       summary: Revogar Token
       tags:
       - Auth
+  /auth/logout-all:
+    post:
+      consumes:
+      - application/json
+      description: Incrementa a versão do token, invalidando todos os tokens do usuário.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.Standard'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/response.Standard'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Standard'
+      security:
+      - ApiKeyAuth: []
+      summary: Revogar todas as sessões
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/auth.RefreshTokenRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/response.Standard'
+            - properties:
+                data:
+                  $ref: '#/definitions/auth.LoginResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/response.Standard'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/response.Standard'
+      summary: Renovar tokens
+      tags:
+      - Auth
   /auth/register:
     post:
       consumes:
@@ -330,7 +411,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handler_auth.RegisterRequest'
+          $ref: '#/definitions/auth.RegisterRequest'
       produces:
       - application/json
       responses:
@@ -341,7 +422,7 @@ paths:
             - $ref: '#/definitions/response.Standard'
             - properties:
                 data:
-                  $ref: '#/definitions/internal_api_handler_auth.UserResponse'
+                  $ref: '#/definitions/auth.UserResponse'
               type: object
         "400":
           description: Bad Request
@@ -365,7 +446,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/internal_api_handler_auth.ResetPasswordRequest'
+          $ref: '#/definitions/auth.ResetPasswordRequest'
       produces:
       - application/json
       responses:
